@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37216.2 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OfficeCliAgent.Excel", "OfficeCliAgent.Excel\OfficeCliAgent.Excel.csproj", "{2381509C-9DE2-4EFF-80B9-7E6126E68E46}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OfficeCliAgent.Core", "..\OfficeCliAgent.Core\OfficeCliAgent.Core.csproj", "{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2381509C-9DE2-4EFF-80B9-7E6126E68E46}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2381509C-9DE2-4EFF-80B9-7E6126E68E46}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2381509C-9DE2-4EFF-80B9-7E6126E68E46}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2381509C-9DE2-4EFF-80B9-7E6126E68E46}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4FE079C8-B21B-4571-8025-3999D788D2FB}
+	EndGlobalSection
+EndGlobal

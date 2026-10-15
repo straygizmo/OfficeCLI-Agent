@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37216.2 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OfficeCliAgent.PowerPoint", "OfficeCliAgent.PowerPoint\OfficeCliAgent.PowerPoint.csproj", "{9EBD5D4B-9A35-42F6-9AF4-200907CF46C5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OfficeCliAgent.Core", "..\OfficeCliAgent.Core\OfficeCliAgent.Core.csproj", "{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9EBD5D4B-9A35-42F6-9AF4-200907CF46C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9EBD5D4B-9A35-42F6-9AF4-200907CF46C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9EBD5D4B-9A35-42F6-9AF4-200907CF46C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9EBD5D4B-9A35-42F6-9AF4-200907CF46C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C9C2BBF5-B311-F6FF-054A-295B2ECB098A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {15D6CEBC-809D-4207-9F3A-522386FB32B1}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="Ribbon_Load">
+  <ribbon>
+    <tabs>
+      <tab idMso="TabHome">
+        <group id="OfficeCliAgentGroup" label="OfficeCLI Agent">
+          <toggleButton id="OfficeCliAgentToggle"
+                        size="large"
+                        getLabel="GetLabel"
+                        screentip="OfficeCLI Agent"
+                        getSupertip="GetSupertip"
+                        imageMso="SmartArtInsert"
+                        onAction="OnTogglePane"
+                        getPressed="GetPanePressed" />
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

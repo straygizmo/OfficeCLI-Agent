@@ -1,0 +1,25 @@
+{
+  "name": "@officecli-agent/host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "officecli-agent-host": "./dist/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/cli.ts",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^1.0.22",
+    "@officecli-agent/protocol": "workspace:*",
+    "ws": "^8.18.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

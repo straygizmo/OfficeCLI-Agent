@@ -1,0 +1,165 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { COPILOT_PROVIDER, DEFAULT_PORT, type ByokProviderInput, type ProviderSummary } from "@officecli-agent/protocol";
+
+/** A BYOK provider as stored in config.json (includes the secret). */
+export interface StoredProvider extends Omit<ByokProviderInput, "apiKey"> {
+  apiKey?: string;
+  /** Read the key from this environment variable instead of storing it. */
+  apiKeyEnv?: string;
+  /** Extra HTTP headers for the provider. */
+  headers?: Record<string, string>;
+}
+
+export interface HostConfig {
+  /** HTTPS/WSS port the task pane connects to. */
+  port: number;
+  /** Default provider: "copilot" or the name of an entry in `providers`. */
+  defaultProvider: string;
+  /** BYOK providers selectable from the task pane. */
+  providers: StoredProvider[];
+  /** Default Copilot model id (CLI default when undefined). */
+  model?: string;
+  /** Directories the agent may read/write on this PC, besides the workspace. */
+  allowedDirectories: string[];
+  /** Path to the officecli executable. */
+  officecliPath: string;
+  /** Path to the GitHub Copilot CLI executable (PATH lookup when undefined). */
+  copilotCliPath?: string;
+  /**
+   * Serve over HTTPS/WSS using localhost.crt / localhost.key from `certDir`.
+   * The VSTO add-in talks to the host over plain ws://127.0.0.1, so this is off by default.
+   */
+  tls: boolean;
+  /** Folder containing localhost.crt / localhost.key (office-addin-dev-certs layout). */
+  certDir: string;
+  /** Root folder for per-session scratch files (exported documents etc.). */
+  workspaceRoot: string;
+  /** Auto-approve read-only tool calls (file reads, read-only MCP calls). */
+  autoApproveReadOnly: boolean;
+  /** Seconds to wait for the user to answer a permission prompt before denying. */
+  permissionTimeoutSeconds: number;
+  /** Also serve the built chat UI (packages/ui/dist) over HTTP for browser-based debugging. */
+  serveTaskpane: boolean;
+  /** Exit when no add-in has been connected for this many seconds (0 = run until killed). */
+  idleExitSeconds: number;
+}
+
+export const CONFIG_DIR = path.join(os.homedir(), ".officecli-agent");
+export const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
+
+const defaults: HostConfig = {
+  port: DEFAULT_PORT,
+  defaultProvider: COPILOT_PROVIDER,
+  providers: [],
+  allowedDirectories: [],
+  officecliPath: "officecli",
+  tls: false,
+  certDir: path.join(os.homedir(), ".office-addin-dev-certs"),
+  workspaceRoot: path.join(CONFIG_DIR, "workspace"),
+  autoApproveReadOnly: true,
+  permissionTimeoutSeconds: 180,
+  serveTaskpane: false,
+  idleExitSeconds: 0,
+};
+
+/** Command-line overrides: --port <n>, --tls / --no-tls, --serve-ui, --idle-exit <seconds>. */
+export function parseArgs(argv: string[]): Partial<HostConfig> {
+  const out: Partial<HostConfig> = {};
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--port" && argv[i + 1]) out.port = Number(argv[++i]);
+    else if (a.startsWith("--port=")) out.port = Number(a.slice(7));
+    else if (a === "--tls") out.tls = true;
+    else if (a === "--no-tls") out.tls = false;
+    else if (a === "--serve-ui") out.serveTaskpane = true;
+    else if (a === "--idle-exit" && argv[i + 1]) out.idleExitSeconds = Number(argv[++i]);
+    else if (a.startsWith("--idle-exit=")) out.idleExitSeconds = Number(a.slice(12));
+  }
+  return out;
+}
+
+export function loadConfig(overrides: Partial<HostConfig> = {}): HostConfig {
+  let fileConfig: Partial<HostConfig> = {};
+  if (fs.existsSync(CONFIG_FILE)) {
+    try {
+      fileConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")) as Partial<HostConfig>;
+    } catch (err) {
+      console.warn(`[config] failed to parse ${CONFIG_FILE}: ${(err as Error).message}`);
+    }
+  } else {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaults, null, 2) + "\n");
+  }
+  const merged: HostConfig = { ...defaults, ...fileConfig, ...overrides };
+  merged.allowedDirectories = (merged.allowedDirectories ?? []).map(expandHome);
+  merged.certDir = expandHome(merged.certDir);
+  merged.workspaceRoot = expandHome(merged.workspaceRoot);
+  merged.providers = Array.isArray(merged.providers) ? merged.providers : [];
+  fs.mkdirSync(merged.workspaceRoot, { recursive: true });
+  return merged;
+}
+
+/** Persist the editable parts of the config (providers, default provider). */
+export function saveConfig(config: HostConfig): void {
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+}
+
+export function resolveApiKey(provider: StoredProvider): string | undefined {
+  if (provider.apiKeyEnv) {
+    const fromEnv = process.env[provider.apiKeyEnv];
+    if (fromEnv) return fromEnv;
+  }
+  return provider.apiKey || undefined;
+}
+
+export function summarizeProviders(config: HostConfig): ProviderSummary[] {
+  return [
+    { name: COPILOT_PROVIDER, type: "copilot", model: config.model, hasApiKey: true },
+    ...config.providers.map((p) => ({
+      name: p.name,
+      type: p.type,
+      baseUrl: p.baseUrl,
+      model: p.model,
+      hasApiKey: Boolean(resolveApiKey(p)),
+    })),
+  ];
+}
+
+/** Add or update a BYOK provider from task-pane input. An omitted apiKey keeps the stored one. */
+export function upsertProvider(config: HostConfig, input: ByokProviderInput): void {
+  const name = input.name.trim();
+  if (!name) throw new Error("Provider name is required.");
+  if (name.toLowerCase() === COPILOT_PROVIDER) throw new Error(`'${COPILOT_PROVIDER}' is reserved.`);
+  if (!/^https?:\/\//i.test(input.baseUrl.trim())) throw new Error("baseUrl must start with http:// or https://");
+
+  const existing = config.providers.find((p) => p.name === name);
+  const next: StoredProvider = {
+    ...(existing ?? {}),
+    name,
+    type: input.type,
+    baseUrl: input.baseUrl.trim(),
+    model: input.model?.trim() || undefined,
+    wireApi: input.wireApi,
+    azureApiVersion: input.azureApiVersion?.trim() || undefined,
+    modelProvider: input.modelProvider,
+  };
+  if (input.apiKey !== undefined) next.apiKey = input.apiKey.trim() || undefined;
+
+  if (existing) Object.assign(existing, next);
+  else config.providers.push(next);
+  saveConfig(config);
+}
+
+export function deleteProvider(config: HostConfig, name: string): void {
+  config.providers = config.providers.filter((p) => p.name !== name);
+  if (config.defaultProvider === name) config.defaultProvider = COPILOT_PROVIDER;
+  saveConfig(config);
+}
+
+export function expandHome(p: string): string {
+  if (p.startsWith("~")) return path.join(os.homedir(), p.slice(1));
+  return p;
+}
