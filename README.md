@@ -59,7 +59,7 @@ pnpm install
 pnpm build          # protocol → host → ui
 ```
 
-Then open `vsto\OfficeCliAgent.<App>\OfficeCliAgent.<App>.sln` in Visual Studio and press F5 (see [vsto/README.md](vsto/README.md) for details). The add-in starts the host (Node) automatically, so you don't need to launch it separately.
+Then open `vsto\OfficeCliAgent.<App>\OfficeCliAgent.<App>.sln` in Visual Studio and press F5 (see [vsto/README.md](vsto/README.md) for details). The manifest signing certificates (`*_TemporaryKey.pfx`) are not included in the repository, so the first time you build, create one in each project's Properties → Signing → "Create Test Certificate...". The add-in starts the host (Node) automatically, so you don't need to launch it separately.
 
 You can also run the host by hand and try the chat UI in a browser:
 

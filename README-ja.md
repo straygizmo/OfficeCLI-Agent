@@ -58,7 +58,7 @@ pnpm install
 pnpm build          # protocol → host → ui
 ```
 
-次に `vsto\OfficeCliAgent.<App>\OfficeCliAgent.<App>.sln` を Visual Studio で開いて F5 で起動します（詳細は [vsto/README.md](vsto/README.md)）。ホスト（Node）はアドインが自動起動するので、別途立ち上げる必要はありません。
+次に `vsto\OfficeCliAgent.<App>\OfficeCliAgent.<App>.sln` を Visual Studio で開いて F5 で起動します（詳細は [vsto/README.md](vsto/README.md)）。マニフェスト署名用の証明書（`*_TemporaryKey.pfx`）はリポジトリに含めていないため、初回はプロジェクトのプロパティ →「署名」→「テスト証明書の作成...」で作成してください。ホスト（Node）はアドインが自動起動するので、別途立ち上げる必要はありません。
 
 ホストだけを手動で動かしてブラウザからチャット UI を試すこともできます。
 

@@ -28,7 +28,8 @@ OfficeCliAgent.PowerPoint/OfficeCliAgent.PowerPoint.sln  PowerPoint (PowerPointO
 
 1. 使いたいアプリのソリューション（例: `OfficeCliAgent.Word\OfficeCliAgent.Word.sln`）を Visual Studio で開く。
 2. 初回は NuGet パッケージの復元が走る（`packages/` フォルダは git 管理外）。
-3. F5 で Office が起動し、タスクペインが自動で開く。ホーム タブ右端の「OfficeCLI Agent」グループのトグルで開閉できる。
+3. 初回のみ、マニフェスト署名用のテスト証明書を作る。署名用の `*_TemporaryKey.pfx` は秘密鍵なのでリポジトリに含めていません（`.gitignore` で除外）。そのままビルドすると証明書が見つからないエラーになるので、プロジェクトのプロパティ →「署名」→「テスト証明書の作成...」で作り直してください（パスワードは空で可）。`.csproj` の `ManifestKeyFile` / `ManifestCertificateThumbprint` が書き換わりますが、これは各自の環境用の変更なのでコミット不要です。
+4. F5 で Office が起動し、タスクペインが自動で開く。ホーム タブ右端の「OfficeCLI Agent」グループのトグルで開閉できる。
 
 新しい VSTO プロジェクトを足す場合（別アプリや作り直し）は、テンプレートで生成 → `ThisAddIn.cs` を上書き → `Ribbon.cs` / `Ribbon.xml`（埋め込みリソース）/ `<App>Ops.cs` を追加 → Core を参照 → NuGet 追加、の順です。
 
