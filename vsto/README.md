@@ -58,7 +58,7 @@ OfficeCliAgent.PowerPoint/OfficeCliAgent.PowerPoint.sln  PowerPoint (PowerPointO
 
 `HostDir` / `UiDir` を省略すると、アドイン DLL の場所から上位へ辿ってリポジトリ（`packages/host/dist/cli.js`）を探します。VSTO の出力は `vsto\OfficeCliAgent.Word\bin\Debug\` なので、リポジトリ内で開発している限り自動で見つかります。
 
-ログ: `%LOCALAPPDATA%\OfficeCliAgent\addin.log`（ホストの標準出力も `host>` として記録）。
+ログ: `%LOCALAPPDATA%\OfficeCliAgent\addin.log`（アドインが起動したホストの出力は同じフォルダの `host.log`）。
 
 ## COM 操作の対応表
 

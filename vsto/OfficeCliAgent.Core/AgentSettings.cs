@@ -33,6 +33,7 @@ namespace OfficeCliAgent.Core
         public static string DataDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OfficeCliAgent");
         public static string ConfigPath => Path.Combine(DataDir, "addin.json");
         public static string LogPath => Path.Combine(DataDir, "addin.log");
+        public static string HostLogPath => Path.Combine(DataDir, "host.log");
         public static string WebViewDataDir => Path.Combine(DataDir, "WebView2");
 
         public static AgentSettings Load()

@@ -35,30 +35,21 @@ namespace OfficeCliAgent.Core
                     "Host not found. Build the repository (pnpm build) or set HostDir in " + AgentSettings.ConfigPath, cli ?? "(unset)");
 
             var args = $"\"{cli}\" --port {_settings.Port} --no-tls --idle-exit {_settings.HostIdleExitSeconds}";
-            var psi = new ProcessStartInfo(_settings.NodePath, args)
+            // The host outlives this Office process, so we must not hold pipes to it: a redirected
+            // stdout/stderr keeps a thread blocked in a native read, and Office then hangs for tens of
+            // seconds on exit while VSTO waits to unload the add-in. cmd.exe writes the output to a file instead.
+            TrimHostLog();
+            var psi = new ProcessStartInfo(Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe",
+                $"/d /s /c \"\"{_settings.NodePath}\" {args} >> \"{AgentSettings.HostLogPath}\" 2>&1\"")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
                 WorkingDirectory = _settings.HostDir,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8,
             };
 
-            var stderr = new StringBuilder();
-            Log.Write($"host: starting {_settings.NodePath} {args}");
+            Log.Write($"host: starting {_settings.NodePath} {args} (output: {AgentSettings.HostLogPath})");
             _process = Process.Start(psi);
             if (_process == null) throw new InvalidOperationException("Failed to start node.");
-            _process.OutputDataReceived += (_, e) => { if (e.Data != null) Log.Write("host> " + e.Data); };
-            _process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data == null) return;
-                Log.Write("host! " + e.Data);
-                lock (stderr) { if (stderr.Length < 4000) stderr.AppendLine(e.Data); }
-            };
-            _process.BeginOutputReadLine();
-            _process.BeginErrorReadLine();
 
             var deadline = DateTime.UtcNow.AddSeconds(90);
             while (DateTime.UtcNow < deadline)
@@ -66,13 +57,35 @@ namespace OfficeCliAgent.Core
                 ct.ThrowIfCancellationRequested();
                 if (_process.HasExited)
                 {
-                    string tail; lock (stderr) tail = stderr.ToString();
-                    throw new InvalidOperationException($"Host exited with code {_process.ExitCode}.\n{tail}");
+                    throw new InvalidOperationException($"Host exited with code {_process.ExitCode}.\n{ReadHostLogTail()}");
                 }
                 if (await IsListeningAsync(ct).ConfigureAwait(false)) return;
                 await Task.Delay(500, ct).ConfigureAwait(false);
             }
-            throw new TimeoutException("Host did not start listening within 90 seconds. See " + AgentSettings.LogPath);
+            throw new TimeoutException("Host did not start listening within 90 seconds. See " + AgentSettings.HostLogPath);
+        }
+
+        private static void TrimHostLog()
+        {
+            try
+            {
+                var file = new FileInfo(AgentSettings.HostLogPath);
+                if (file.Exists && file.Length > 1024 * 1024) file.Delete();
+            }
+            catch { /* a running host may still hold it; keep appending */ }
+        }
+
+        private static string ReadHostLogTail()
+        {
+            try
+            {
+                using (var stream = new FileStream(AgentSettings.HostLogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    stream.Seek(Math.Max(0, stream.Length - 4000), SeekOrigin.Begin);
+                    using (var reader = new StreamReader(stream, Encoding.UTF8)) return reader.ReadToEnd();
+                }
+            }
+            catch { return ""; }
         }
 
         public async Task<bool> IsListeningAsync(CancellationToken ct)
