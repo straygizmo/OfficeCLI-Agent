@@ -39,6 +39,7 @@ namespace OfficeCliAgent.Excel
                 case "getContext": return GetContext();
                 case "exportFile": return ExportFile(Ops.Str(op, "targetPath"));
                 case "importFile": return ImportFile(Ops.Str(op, "path"), Ops.Options(op));
+                case "insertImage": return InsertImage(Ops.Str(op, "path"), Ops.Options(op));
                 case "excel.listSheets": return ListSheets();
                 case "excel.getRange": return GetRange(Ops.Str(op, "sheet"), Ops.Str(op, "address"));
                 case "excel.setRange": return SetRange(Ops.Str(op, "sheet"), Ops.Str(op, "address"), op["values"] as JArray, op["formulas"] as JArray, Ops.Str(op, "numberFormat"));
@@ -141,6 +142,36 @@ namespace OfficeCliAgent.Excel
                 book.Activate();
             }
             return $"Inserted {copied.Count} sheet(s) from {Path.GetFileName(path)}: {string.Join(", ", copied)}";
+        }
+
+        private JToken InsertImage(string path, JObject options)
+        {
+            Ops.RequireImageFile(path, options);
+            var ws = Sheet(Ops.Str(options, "sheet"));
+            var cell = Ops.Str(options, "cell");
+            Interop.Range anchor;
+            if (!string.IsNullOrEmpty(cell))
+            {
+                try { anchor = ws.Range[cell]; }
+                catch { throw new OfficeOpException($"'{cell}' is not a valid cell address."); }
+            }
+            else if (_app.ActiveSheet is Interop.Worksheet active && active.Name == ws.Name && _app.ActiveCell != null) anchor = _app.ActiveCell;
+            else anchor = ws.Range["A1"];
+
+            // -1 width/height = the picture's original size. Embedded, not linked.
+            var shape = ws.Shapes.AddPicture(path, Microsoft.Office.Core.MsoTriState.msoFalse, Microsoft.Office.Core.MsoTriState.msoTrue,
+                (float)(double)anchor.Left, (float)(double)anchor.Top, -1, -1);
+            Ops.FitSize(shape.Width, shape.Height, Ops.Num(options, "width"), Ops.Num(options, "height"), out var w, out var h);
+            if (w != shape.Width || h != shape.Height)
+            {
+                shape.LockAspectRatio = Microsoft.Office.Core.MsoTriState.msoFalse;
+                shape.Width = w;
+                shape.Height = h;
+                shape.LockAspectRatio = Microsoft.Office.Core.MsoTriState.msoTrue;
+            }
+            var alt = Ops.Str(options, "altText");
+            if (!string.IsNullOrEmpty(alt)) shape.AlternativeText = alt;
+            return $"Inserted picture {Path.GetFileName(path)} as '{shape.Name}' at {ws.Name}!{anchor.Address[false, false]} ({shape.Width:0.#} x {shape.Height:0.#} pt).";
         }
 
         private JToken ListSheets()

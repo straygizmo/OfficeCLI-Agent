@@ -39,12 +39,34 @@ export interface ExcelImportOptions {
 
 export type ImportOptions = WordImportOptions | PowerPointImportOptions | ExcelImportOptions;
 
+/** Where and how big to place a picture. Fields that do not apply to the host app are ignored. */
+export interface InsertImageOptions {
+  /** Word: Selection (replaces a non-empty selection; default) | Start | End. */
+  location?: "Selection" | "Start" | "End";
+  /** Excel: worksheet name (active sheet when omitted). */
+  sheet?: string;
+  /** Excel: cell for the picture's top-left corner, e.g. "B3" (active cell when omitted). */
+  cell?: string;
+  /** PowerPoint: 1-based slide (current slide when omitted). */
+  slide?: number;
+  /** PowerPoint: position in points (centered on the slide when omitted). */
+  left?: number;
+  top?: number;
+  /** Size in points (1 cm ≈ 28.35 pt). One side keeps the aspect ratio; both stretch. Original size when omitted. */
+  width?: number;
+  height?: number;
+  /** Alternative text for accessibility. */
+  altText?: string;
+}
+
 export type OfficeOp =
   // ---- common ----
   | { kind: "getContext" }
   /** Save a copy of the live document to `targetPath` (the add-in writes the file). */
   | { kind: "exportFile"; targetPath: string }
   | { kind: "importFile"; path: string; options?: ImportOptions }
+  /** Insert a picture file (embedded, not linked) into the live document. */
+  | { kind: "insertImage"; path: string; options?: InsertImageOptions }
   // ---- Word ----
   | { kind: "word.getSelection" }
   | { kind: "word.insertText"; text: string; location: "Selection" | "Start" | "End"; style?: string }

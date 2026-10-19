@@ -38,6 +38,7 @@ namespace OfficeCliAgent.PowerPoint
                 case "getContext": return GetContext();
                 case "exportFile": return ExportFile(Ops.Str(op, "targetPath"));
                 case "importFile": return ImportFile(Ops.Str(op, "path"), Ops.Options(op));
+                case "insertImage": return InsertImage(Ops.Str(op, "path"), Ops.Options(op));
                 case "ppt.setShapeText": return SetShapeText(Ops.Int(op, "slide") ?? 0, Ops.Str(op, "shape"), Ops.Str(op, "text", ""));
                 case "ppt.addSlide": return AddSlide(Ops.Int(op, "layout") ?? 2, Ops.Str(op, "title"), Ops.Str(op, "body"), Ops.Int(op, "after"));
                 case "ppt.deleteSlides": return DeleteSlides((op["slides"] as JArray)?.Select(t => t.Value<int>()).ToList());
@@ -134,6 +135,49 @@ namespace OfficeCliAgent.PowerPoint
                 return $"Inserted {inserted} slide(s) from {Path.GetFileName(path)} after slide {index} using the destination theme (keepSourceFormatting is not supported via COM; use officecli on an exported copy if the source design must be preserved).";
             }
             return $"Inserted {inserted} slide(s) from {Path.GetFileName(path)} after slide {index}. Slide count: {pres.Slides.Count}.";
+        }
+
+        private JToken InsertImage(string path, JObject options)
+        {
+            Ops.RequireImageFile(path, options);
+            var pres = Pres;
+            var index = Ops.Int(options, "slide") ?? CurrentSlideIndex();
+            var slide = Slide(index);
+            var slideW = pres.PageSetup.SlideWidth;
+            var slideH = pres.PageSetup.SlideHeight;
+
+            // -1 width/height = the picture's original size. Embedded, not linked.
+            var shape = slide.Shapes.AddPicture(path, Office.MsoTriState.msoFalse, Office.MsoTriState.msoTrue, 0, 0, -1, -1);
+            var reqW = Ops.Num(options, "width");
+            var reqH = Ops.Num(options, "height");
+            float w, h;
+            if (reqW == null && reqH == null && (shape.Width > slideW || shape.Height > slideH))
+            {
+                // Large photos would spill off the slide at their original size: shrink to fit.
+                var scale = Math.Min(slideW / shape.Width, slideH / shape.Height);
+                w = shape.Width * scale;
+                h = shape.Height * scale;
+            }
+            else Ops.FitSize(shape.Width, shape.Height, reqW, reqH, out w, out h);
+            if (w != shape.Width || h != shape.Height)
+            {
+                shape.LockAspectRatio = Office.MsoTriState.msoFalse;
+                shape.Width = w;
+                shape.Height = h;
+                shape.LockAspectRatio = Office.MsoTriState.msoTrue;
+            }
+            shape.Left = (float)(Ops.Num(options, "left") ?? (slideW - shape.Width) / 2);
+            shape.Top = (float)(Ops.Num(options, "top") ?? (slideH - shape.Height) / 2);
+            var alt = Ops.Str(options, "altText");
+            if (!string.IsNullOrEmpty(alt)) shape.AlternativeText = alt;
+            return $"Inserted picture {Path.GetFileName(path)} as '{shape.Name}' on slide {index} " +
+                   $"(left {shape.Left:0.#}, top {shape.Top:0.#}, {shape.Width:0.#} x {shape.Height:0.#} pt; slide {slideW:0.#} x {slideH:0.#} pt).";
+        }
+
+        private int CurrentSlideIndex()
+        {
+            try { return _app.ActiveWindow.View.Slide.SlideIndex; }
+            catch { return 1; } // no window or no slide selected (e.g. a section header is active)
         }
 
         private JToken SetShapeText(int slideIndex, string shapeName, string text)

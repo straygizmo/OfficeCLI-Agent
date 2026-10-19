@@ -8,6 +8,7 @@ Word / Excel / PowerPoint（Windows デスクトップ版）に組み込む、�
 - **文書編集**: [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) をホスト側のツールとして接続（ホストが CLI を直接実行）。ピボット、変更履歴、アニメーション、数式、Mermaid 図、テンプレート差し込み、問題診断、スクリーンショットなど OOXML レベルの編集を高精度に行えます。
 - **ライブ編集**: Office の COM オブジェクトモデルで「いま開いている文書」を直接読み書き（Undo 可）。
 - **他ファイルの取り込み**: PC 上の `.docx` / `.xlsx` / `.pptx` をエージェントが読み、開いている文書へ差し込みます（Word: 本文/選択範囲へ挿入、PowerPoint: スライド挿入、Excel: シート追加）。
+- **画像の挿入**: `office_insert_image` で PNG / JPEG / GIF / BMP / TIFF / SVG / EMF / WMF を開いている文書へ挿入します（Word: 選択位置、Excel: 指定セル、PowerPoint: スライド上）。
 
 タスクペインとリボンの表示言語は Office の UI 言語に合わせて切り替わります（日本語環境では日本語、それ以外は英語）。
 
@@ -26,6 +27,7 @@ Word / Excel / PowerPoint（Windows デスクトップ版）に組み込む、�
 │  GitHub Copilot SDK → Copilot CLI (エージェントループ, Copilot または BYOK) │
 │   ├ カスタムツール: office_get_document_context / office_export_document │
 │   │                 / office_import_file / word_* / excel_* / ppt_*     │
+│   │                 / office_insert_image                               │
 │   ├ officecli ツール: CLI を直接実行 (読み取りは自動承認、書き込みは確認) │
 │   └ 組み込み: ファイル閲覧/検索/編集, シェル (タスクペインで承認)         │
 └──────────────────────────────────────────────────────────────────────┘
