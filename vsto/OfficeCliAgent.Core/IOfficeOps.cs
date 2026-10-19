@@ -44,6 +44,32 @@ namespace OfficeCliAgent.Core
             return t == null || t.Type == JTokenType.Null ? (int?)null : t.Value<int>();
         }
 
+        public static double? Num(JObject op, string name)
+        {
+            var t = op[name];
+            return t == null || t.Type == JTokenType.Null ? (double?)null : t.Value<double>();
+        }
+
+        /// <summary>insertImage checks, run before anything is inserted so a bad request leaves the document untouched.</summary>
+        public static void RequireImageFile(string path, JObject options)
+        {
+            if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) throw new OfficeOpException("File not found: " + path);
+            if (Num(options, "width") <= 0 || Num(options, "height") <= 0) throw new OfficeOpException("width and height must be positive.");
+        }
+
+        /// <summary>
+        /// Target picture size in points. One requested side keeps the aspect ratio,
+        /// both stretch, neither keeps the original size.
+        /// </summary>
+        public static void FitSize(float origW, float origH, double? w, double? h, out float outW, out float outH)
+        {
+            outW = origW;
+            outH = origH;
+            if (w.HasValue && h.HasValue) { outW = (float)w.Value; outH = (float)h.Value; }
+            else if (w.HasValue) { outW = (float)w.Value; outH = origW > 0 ? origH * outW / origW : origH; }
+            else if (h.HasValue) { outH = (float)h.Value; outW = origH > 0 ? origW * outH / origH : origW; }
+        }
+
         public static bool Bool(JObject op, string name, bool fallback = false)
         {
             var t = op[name];

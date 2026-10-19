@@ -55,9 +55,9 @@ const ja = {
   settingsNoteSuffix: " に保存されます。",
   close: "閉じる",
   emptyIntro: {
-    Word: "開いているWord文書を読み取り・編集し、PC上の他のOfficeファイルを取り込めます。",
-    Excel: "開いているExcelブックを読み取り・編集し、PC上の他のOfficeファイルを取り込めます。",
-    PowerPoint: "開いているPowerPointプレゼンテーションを読み取り・編集し、PC上の他のOfficeファイルを取り込めます。",
+    Word: "開いているWord文書を読み取り・編集し、PC上の他のOfficeファイルや画像を取り込めます。",
+    Excel: "開いているExcelブックを読み取り・編集し、PC上の他のOfficeファイルや画像を取り込めます。",
+    PowerPoint: "開いているPowerPointプレゼンテーションを読み取り・編集し、PC上の他のOfficeファイルや画像を取り込めます。",
   } as Record<HostApp, string>,
   examples: {
     Word: [
@@ -142,9 +142,9 @@ const en: typeof ja = {
   settingsNoteSuffix: ".",
   close: "Close",
   emptyIntro: {
-    Word: "Read and edit the open Word document, and bring in other Office files from this PC.",
-    Excel: "Read and edit the open Excel workbook, and bring in other Office files from this PC.",
-    PowerPoint: "Read and edit the open PowerPoint presentation, and bring in other Office files from this PC.",
+    Word: "Read and edit the open Word document, and bring in other Office files and pictures from this PC.",
+    Excel: "Read and edit the open Excel workbook, and bring in other Office files and pictures from this PC.",
+    PowerPoint: "Read and edit the open PowerPoint presentation, and bring in other Office files and pictures from this PC.",
   },
   examples: {
     Word: [

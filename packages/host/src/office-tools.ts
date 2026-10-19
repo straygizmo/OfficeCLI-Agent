@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { defineTool, type Tool } from "@github/copilot-sdk";
 import { z } from "zod";
-import type { DocumentContext, HostApp, ImportOptions, OfficeOp, UiLocale } from "@officecli-agent/protocol";
+import type { DocumentContext, HostApp, ImportOptions, InsertImageOptions, OfficeOp, UiLocale } from "@officecli-agent/protocol";
 import type { TaskpaneLink } from "./taskpane-link.js";
 
 export interface OfficeToolContext {
@@ -17,6 +17,8 @@ export interface OfficeToolContext {
 }
 
 const EXT: Record<HostApp, string> = { Word: "docx", Excel: "xlsx", PowerPoint: "pptx" };
+/** Picture formats Office desktop can insert as-is. */
+const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".svg", ".emf", ".wmf"];
 const MAX_RESULT_CHARS = 60_000;
 
 function clip(text: string): string {
@@ -129,6 +131,48 @@ export function createOfficeTools(ctx: OfficeToolContext): Tool<unknown>[] {
     },
   });
 
+  const size = {
+    width: z.number().positive().optional().describe("Width in points (1 cm ≈ 28.35 pt). Give only width or height to keep the aspect ratio."),
+    height: z.number().positive().optional().describe("Height in points."),
+    altText: z.string().optional().describe("Alternative text for accessibility."),
+  };
+  const imagePlacement =
+    ctx.hostApp === "Word"
+      ? z.object({ location: z.enum(["Selection", "Start", "End"]).optional().describe("Selection (default; replaces selected text) | Start | End."), ...size })
+      : ctx.hostApp === "Excel"
+        ? z.object({ sheet: z.string().optional(), cell: z.string().optional().describe("Top-left cell, e.g. 'B3' (active cell when omitted)."), ...size })
+        : z.object({
+            slide: z.number().int().positive().optional().describe("1-based slide (current slide when omitted)."),
+            left: z.number().optional().describe("Points from the left edge (centered when omitted)."),
+            top: z.number().optional().describe("Points from the top edge (centered when omitted)."),
+            ...size,
+          });
+
+  const insertImage = defineTool("office_insert_image", {
+    description:
+      `Insert a picture file (${IMAGE_EXTS.join(" ")}) from disk into the LIVE ${ctx.hostApp} document, embedded (not linked). ` +
+      (ctx.hostApp === "Word"
+        ? "It goes in line with the text at the selection, or at the start/end of the body."
+        : ctx.hostApp === "Excel"
+          ? "It floats over the sheet with its top-left corner at the given cell."
+          : "It is placed on one slide; large pictures are shrunk to fit the slide when no size is given.") +
+      " Original size when no width/height is given. For another format, convert it first (e.g. with the shell).",
+    parameters: z.object({
+      filePath: z.string().describe("Absolute path to the picture file."),
+      options: imagePlacement.optional(),
+    }),
+    handler: async ({ filePath, options }) => {
+      const abs = await ensureReadable(filePath);
+      if (!IMAGE_EXTS.includes(path.extname(abs).toLowerCase())) {
+        return {
+          textResultForLlm: `office_insert_image accepts ${IMAGE_EXTS.join(", ")} files. Convert ${path.basename(abs)} to PNG first.`,
+          resultType: "failure" as const,
+        };
+      }
+      return run({ kind: "insertImage", path: abs, options: options as InsertImageOptions | undefined });
+    },
+  });
+
   const workspaceInfo = defineTool("workspace_info", {
     description: "Return the session workspace directory (scratch folder for exported/edited copies) and the folders on this PC the agent may read without asking.",
     parameters: z.object({}),
@@ -142,7 +186,7 @@ export function createOfficeTools(ctx: OfficeToolContext): Tool<unknown>[] {
     }),
   });
 
-  const common: Tool<unknown>[] = [getContext, exportDoc, importFile, workspaceInfo] as Tool<unknown>[];
+  const common: Tool<unknown>[] = [getContext, exportDoc, importFile, insertImage, workspaceInfo] as Tool<unknown>[];
 
   // ---- Word ---------------------------------------------------------------
 

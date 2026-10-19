@@ -37,6 +37,7 @@ namespace OfficeCliAgent.Word
                 case "getContext": return GetContext();
                 case "exportFile": return ExportFile(Ops.Str(op, "targetPath"));
                 case "importFile": return ImportFile(Ops.Str(op, "path"), Ops.Options(op));
+                case "insertImage": return InsertImage(Ops.Str(op, "path"), Ops.Options(op));
                 case "word.getSelection": return GetSelection();
                 case "word.insertText": return InsertText(Ops.Str(op, "text", ""), Ops.Str(op, "location", "Selection"), Ops.Str(op, "style"));
                 case "word.replaceText": return ReplaceText(Ops.Str(op, "find"), Ops.Str(op, "replace", ""), Ops.Bool(op, "matchCase"), Ops.Bool(op, "replaceAll", true));
@@ -121,13 +122,29 @@ namespace OfficeCliAgent.Word
             return $"Inserted {Path.GetFileName(path)} ({location}); characters {before} -> {after}.";
         }
 
-        private JToken GetSelection()
+        private JToken InsertImage(string path, JObject options)
         {
-            var sel = _app.Selection;
-            return new JObject { ["text"] = sel.Text, ["start"] = sel.Start, ["end"] = sel.End, ["type"] = sel.Type.ToString() };
+            Ops.RequireImageFile(path, options);
+            var location = Ops.Str(options, "location", "Selection");
+            var range = TargetRange(location);
+
+            // Inline picture, embedded in the document. A non-collapsed range is replaced.
+            var pic = Doc.InlineShapes.AddPicture(path, LinkToFile: false, SaveWithDocument: true, Range: range);
+            Ops.FitSize(pic.Width, pic.Height, Ops.Num(options, "width"), Ops.Num(options, "height"), out var w, out var h);
+            if (w != pic.Width || h != pic.Height)
+            {
+                pic.LockAspectRatio = Microsoft.Office.Core.MsoTriState.msoFalse;
+                pic.Width = w;
+                pic.Height = h;
+                pic.LockAspectRatio = Microsoft.Office.Core.MsoTriState.msoTrue;
+            }
+            var alt = Ops.Str(options, "altText");
+            if (!string.IsNullOrEmpty(alt)) pic.AlternativeText = alt;
+            return $"Inserted picture {Path.GetFileName(path)} at {location} ({pic.Width:0.#} x {pic.Height:0.#} pt).";
         }
 
-        private JToken InsertText(string text, string location, string style)
+        /// <summary>Selection range, or a collapsed range at the start/end of the body.</summary>
+        private Interop.Range TargetRange(string location)
         {
             var doc = Doc;
             Interop.Range range;
@@ -145,6 +162,18 @@ namespace OfficeCliAgent.Word
                     range = _app.Selection.Range;
                     break;
             }
+            return range;
+        }
+
+        private JToken GetSelection()
+        {
+            var sel = _app.Selection;
+            return new JObject { ["text"] = sel.Text, ["start"] = sel.Start, ["end"] = sel.End, ["type"] = sel.Type.ToString() };
+        }
+
+        private JToken InsertText(string text, string location, string style)
+        {
+            var range = TargetRange(location);
             range.Text = text.Replace("\r\n", "\n").Replace("\n", "\r");
             if (!string.IsNullOrEmpty(style))
             {

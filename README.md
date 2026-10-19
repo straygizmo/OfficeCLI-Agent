@@ -8,6 +8,7 @@ An open-source AI agent **VSTO add-in** for Word / Excel / PowerPoint (Windows d
 - **Document editing**: [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) is wired in as a host-side tool (the host runs the CLI directly). It enables high-fidelity OOXML-level editing: pivots, tracked changes, animations, equations, Mermaid diagrams, template merges, issue diagnostics, screenshots and more.
 - **Live editing**: Reads and writes the *currently open* document directly through the Office COM object model (undoable).
 - **Importing other files**: The agent reads `.docx` / `.xlsx` / `.pptx` files on your PC and inserts them into the open document (Word: insert into the body/selection, PowerPoint: insert slides, Excel: add sheets).
+- **Inserting pictures**: `office_insert_image` puts PNG / JPEG / GIF / BMP / TIFF / SVG / EMF / WMF files into the open document (Word: at the selection, Excel: at a cell, PowerPoint: on a slide).
 
 The task pane and ribbon follow the Office UI language: Japanese in Japanese environments, English everywhere else.
 
@@ -26,6 +27,7 @@ The task pane and ribbon follow the Office UI language: Japanese in Japanese env
 │  GitHub Copilot SDK → Copilot CLI (agent loop, Copilot or BYOK)        │
 │   ├ Custom tools: office_get_document_context / office_export_document │
 │   │               / office_import_file / word_* / excel_* / ppt_*      │
+│   │               / office_insert_image                                │
 │   ├ officecli tool: runs the CLI directly (reads auto-approved,        │
 │   │                 writes need confirmation)                          │
 │   └ Built-in: file view/search/edit, shell (approved in the task pane) │

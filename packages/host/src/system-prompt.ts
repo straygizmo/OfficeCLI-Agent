@@ -24,6 +24,7 @@ export function buildSystemPrompt(hostApp: HostApp, workspaceDir: string, office
       ? "- officecli: read/analyze/edit .docx/.xlsx/.pptx files on disk with high fidelity. Pass a raw command line, e.g. `view report.docx outline`, `view deck.pptx issues --json`, `view deck.pptx screenshot -o out.png --page 1`, `get budget.xlsx /Sheet1 --depth 1 --json`, `add deck.pptx / --type slide --prop title=\"Q4\"`, `batch file.docx --input ops.json`. Run `help <docx|xlsx|pptx> <set|add|query>` when unsure. Always use absolute paths. Never try to drive the running Office application from a shell (COM/PowerShell automation) — it crashes the host app; use the live tools or officecli instead."
       : "- officecli is NOT installed on this PC; tell the user to install it (https://github.com/iOfficeAI/OfficeCLI) for advanced document operations.",
     "- office_import_file: insert a .docx/.xlsx/.pptx from disk into the live document (files the user names, or a workspace copy you edited with officecli).",
+    "- office_insert_image: insert a picture file (png/jpg/gif/bmp/tif/svg/emf/wmf) from disk into the live document. Use it for any request to add an image, photo, logo or screenshot.",
     "- Built-in file tools (view/grep/glob/edit/shell) work on this PC and ask the user for permission when needed. Prefer officecli over shell for Office files.",
     "",
     "## Workflows",
