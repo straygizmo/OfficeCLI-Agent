@@ -211,16 +211,16 @@ export function App({ hostApp: initialHostApp }: Props) {
     return `${providerName} / ${modelName ?? t.defaultModelShort}`;
   }, [providers, models, activeSession]);
 
-  const stateLabel = useMemo(() => {
+  const [stateLabel, stateTip] = useMemo(() => {
     switch (state) {
       case "ready":
-        return t.stateReady;
+        return [t.stateReady, t.stateReadyTip];
       case "connected":
-        return t.stateConnected;
+        return [t.stateConnected, t.stateConnectedTip];
       case "connecting":
-        return t.stateConnecting;
+        return [t.stateConnecting, t.stateConnectingTip];
       default:
-        return isEmbeddedInWebView2() ? t.stateDisconnectedEmbedded : t.stateDisconnectedBrowser;
+        return [t.stateDisconnected, isEmbeddedInWebView2() ? t.stateDisconnectedEmbeddedTip : t.stateDisconnectedBrowserTip];
     }
   }, [state]);
 
@@ -231,6 +231,9 @@ export function App({ hostApp: initialHostApp }: Props) {
           {activeLabel}
         </span>
         <div className="actions">
+          <span className={`badge ${state}`} title={stateTip}>
+            {stateLabel}
+          </span>
           <button className="icon" onClick={() => window.location.reload()} title={t.reloadTitle} aria-label={t.reloadTitle}>
             ↻
           </button>
@@ -363,14 +366,14 @@ export function App({ hostApp: initialHostApp }: Props) {
         </section>
       )}
 
-      <div className="status">{status || stateLabel}</div>
+      {status && <div className="status">{status}</div>}
 
       <main className="chat" ref={listRef}>
         {items.length === 0 && (
           <div className="empty">
-            <p>{t.emptyIntro(hostApp)}</p>
+            <p>{t.emptyIntro[hostApp]}</p>
             <ul>
-              {t.examples.map((example) => (
+              {t.examples[hostApp].map((example) => (
                 <li key={example}>{example}</li>
               ))}
             </ul>
@@ -403,27 +406,35 @@ export function App({ hostApp: initialHostApp }: Props) {
       </main>
 
       <footer className="composer">
-        <textarea
-          value={input}
-          placeholder={state === "ready" ? t.inputPlaceholder : t.inputDisabled}
-          disabled={state !== "ready"}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-          rows={3}
-        />
-        <div className="composer-actions">
-          {busy ? (
-            <button onClick={abort}>{t.stop}</button>
-          ) : (
-            <button className="primary" onClick={send} disabled={state !== "ready" || !input.trim()}>
-              {t.send}
-            </button>
-          )}
+        <div className="input-wrap">
+          <textarea
+            value={input}
+            placeholder={state === "ready" ? t.inputPlaceholder : t.inputDisabled}
+            disabled={state !== "ready"}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            rows={4}
+          />
+          <div className="input-action">
+            {busy ? (
+              <button className="icon stop" onClick={abort} title={t.stop} aria-label={t.stop}>
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+                  <rect x="3.5" y="3.5" width="9" height="9" rx="1.5" />
+                </svg>
+              </button>
+            ) : (
+              <button className="icon" onClick={send} disabled={state !== "ready" || !input.trim()} title={t.send} aria-label={t.send}>
+                <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true">
+                  <path d="M1.7 2.2a.6.6 0 0 1 .8-.7l11.8 5.9a.7.7 0 0 1 0 1.2L2.5 14.5a.6.6 0 0 1-.8-.7L3 8.6h5.2a.6.6 0 0 0 0-1.2H3L1.7 2.2z" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </footer>
     </div>

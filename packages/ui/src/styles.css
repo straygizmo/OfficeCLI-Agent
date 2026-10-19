@@ -30,13 +30,8 @@
 html, body, #root { height: 100%; margin: 0; }
 .app { display: flex; flex-direction: column; height: 100%; }
 .topbar { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-.title { display: flex; align-items: center; gap: 6px; }
 .muted { color: var(--muted); }
 .small { font-size: 11px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #999; display: inline-block; }
-.dot.ready { background: var(--ok); }
-.dot.connecting, .dot.connected { background: #d29200; }
-.dot.disconnected { background: var(--err); }
 .actions button, .composer button, .permission button { border: 1px solid var(--border); background: transparent; color: var(--fg); padding: 4px 10px; border-radius: 4px; cursor: pointer; }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 button:disabled { opacity: 0.5; cursor: default; }
@@ -68,7 +63,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 .permission-actions { display: flex; gap: 6px; }
 .composer { border-top: 1px solid var(--border); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 .composer textarea { font: inherit; resize: vertical; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); }
-.composer-actions { display: flex; justify-content: flex-end; }
 .provider-list { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border); padding-top: 6px; }
 .row-between { display: flex; justify-content: space-between; align-items: center; }
 .row-end { display: flex; justify-content: flex-end; gap: 6px; }
@@ -92,3 +86,16 @@ button:disabled { opacity: 0.5; cursor: default; }
 .actions button.icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 26px; padding: 0; }
 .active-model { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { flex-shrink: 0; }
+.actions { align-items: center; }
+.badge { font-size: 11px; line-height: 1; padding: 4px 8px; border-radius: 999px; white-space: nowrap; cursor: help; color: #fff; background: #999; }
+.badge.ready { background: var(--ok); }
+.badge.connecting, .badge.connected { background: #d29200; }
+.badge.disconnected { background: var(--err); }
+.composer button.icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 28px; padding: 0; }
+.input-wrap { position: relative; display: flex; flex-direction: column; }
+.input-wrap textarea { padding-right: 46px; }
+.input-action { position: absolute; right: 18px; bottom: 6px; }
+.input-action button.icon { border: none; background: transparent; color: var(--accent); width: 28px; height: 28px; border-radius: 4px; }
+.input-action button.icon:hover:not(:disabled) { background: var(--assistant); }
+.input-action button.icon:disabled { color: var(--muted); opacity: 0.6; }
+.input-action button.icon.stop { color: var(--err); }
