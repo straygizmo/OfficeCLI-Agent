@@ -55,6 +55,8 @@ export function App({ hostApp: initialHostApp }: Props) {
   const [status, setStatus] = useState<string>("");
   const [info, setInfo] = useState<{ workspaceDir: string; officecliAvailable: boolean; allowedDirectories: string[] } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  // Settings the current session was started with (edits apply only after a reset).
+  const [activeSession, setActiveSession] = useState<SessionSettings>(settings.session);
   const listRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<HostClient | null>(null);
   const settingsRef = useRef(settings);
@@ -147,7 +149,11 @@ export function App({ hostApp: initialHostApp }: Props) {
   );
 
   useEffect(() => {
-    const client = new HostClient(settings.hostUrl, initialHostApp, () => settingsRef.current.session, { onState: setState, onMessage: handleMessage });
+    const client = new HostClient(settings.hostUrl, initialHostApp, () => {
+      const session = settingsRef.current.session;
+      setActiveSession(session);
+      return session;
+    }, { onState: setState, onMessage: handleMessage });
     clientRef.current = client;
     client.connect();
     return () => client.stop();
@@ -196,6 +202,15 @@ export function App({ hostApp: initialHostApp }: Props) {
   const selectedProvider = providers.find((p) => p.name === (settings.session.provider ?? COPILOT_PROVIDER));
   const isCopilot = !selectedProvider || selectedProvider.type === "copilot";
 
+  const activeLabel = useMemo(() => {
+    const provider = providers.find((p) => p.name === (activeSession.provider ?? COPILOT_PROVIDER));
+    const copilot = !provider || provider.type === "copilot";
+    const providerName = copilot ? "Copilot" : provider.name;
+    const modelId = activeSession.model ?? (copilot ? undefined : provider.model);
+    const modelName = copilot ? models.find((m) => m.id === modelId)?.name ?? modelId : modelId;
+    return `${providerName} / ${modelName ?? t.defaultModelShort}`;
+  }, [providers, models, activeSession]);
+
   const stateLabel = useMemo(() => {
     switch (state) {
       case "ready":
@@ -212,20 +227,29 @@ export function App({ hostApp: initialHostApp }: Props) {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="title">
-          <span className={`dot ${state}`} />
-          <strong>OfficeCLI Agent</strong>
-          <span className="muted">{hostApp}</span>
-        </div>
+        <span className="active-model muted small" title={activeLabel}>
+          {activeLabel}
+        </span>
         <div className="actions">
-          <button onClick={() => window.location.reload()} title={t.reloadTitle}>
+          <button className="icon" onClick={() => window.location.reload()} title={t.reloadTitle} aria-label={t.reloadTitle}>
             ↻
           </button>
-          <button onClick={reset} title={t.resetTitle}>
-            {t.reset}
+          <button className="icon" onClick={reset} title={t.resetTitle} aria-label={t.reset}>
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v4.5M9.2 6.5v4.5" />
+            </svg>
           </button>
-          <button onClick={() => setShowSettings((s) => !s)} title={showSettings ? t.closeSettings : t.openSettings} className={showSettings ? "active" : ""}>
-            {t.settings}
+          <button
+            onClick={() => setShowSettings((s) => !s)}
+            title={showSettings ? t.closeSettings : t.openSettings}
+            aria-label={t.settings}
+            className={`icon${showSettings ? " active" : ""}`}
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="8" cy="8" r="2.2" />
+              <path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M3.4 12.6l1.3-1.3M11.3 4.7l1.3-1.3" />
+              <circle cx="8" cy="8" r="4.3" />
+            </svg>
           </button>
         </div>
       </header>
