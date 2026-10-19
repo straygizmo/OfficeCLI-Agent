@@ -3,13 +3,13 @@
   <ribbon>
     <tabs>
       <tab idMso="TabHome">
-        <group id="OfficeCliAgentGroup" label="OfficeCLI Agent">
+        <group id="OfficeCliAgentGroup" label="OfficeCLI">
           <toggleButton id="OfficeCliAgentToggle"
                         size="large"
-                        getLabel="GetLabel"
+                        label="Agent"
                         screentip="OfficeCLI Agent"
                         getSupertip="GetSupertip"
-                        imageMso="SmartArtInsert"
+                        getImage="GetImage"
                         onAction="OnTogglePane"
                         getPressed="GetPanePressed" />
         </group>

@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -27,7 +28,7 @@ namespace OfficeCliAgent.PowerPoint
 
         public bool GetPanePressed(Office.IRibbonControl control) => Globals.ThisAddIn.IsPaneVisible;
 
-        public string GetLabel(Office.IRibbonControl control) => OfficeCliAgent.Core.UiLanguage.T("エージェント", "Agent");
+        public Bitmap GetImage(Office.IRibbonControl control) => OfficeCliAgent.Core.RibbonIcons.Chat();
 
         public string GetSupertip(Office.IRibbonControl control) =>
             OfficeCliAgent.Core.UiLanguage.T("Copilot エージェントのチャットを開閉します。", "Show or hide the Copilot agent chat.");

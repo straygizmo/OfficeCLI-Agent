@@ -20,7 +20,7 @@ namespace OfficeCliAgent.Word
             try
             {
                 _controller = new AgentController(new WordOps(Application));
-                _pane = CustomTaskPanes.Add(_controller.Pane, "OfficeCLI Agent");
+                _pane = CustomTaskPanes.Add(_controller.Pane, "OfficeCLI Agent for Word");
                 _pane.Width = 420;
                 _pane.VisibleChanged += (_, __) => Ribbon?.Invalidate();
                 // Show the pane right away so the add-in is usable even if the ribbon XML failed to load.
