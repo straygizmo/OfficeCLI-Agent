@@ -9,7 +9,9 @@ namespace OfficeCliAgent.Core
     /// Add-in side settings. Stored in %LOCALAPPDATA%\OfficeCliAgent\addin.json;
     /// environment variables OFFICECLI_AGENT_PORT / _HOST_DIR / _UI_DIR / _NODE override it.
     /// Unset host/UI directories are resolved by walking up from the add-in assembly
-    /// until a repo checkout (packages/host/dist/cli.js, packages/ui/dist/taskpane.html) is found.
+    /// until either a repo checkout (packages/host/dist/cli.js, packages/ui/dist/taskpane.html)
+    /// or an installed layout (host/dist/cli.js, ui/taskpane.html next to addin/) is found.
+    /// See <see cref="InstallLayout"/>.
     /// </summary>
     public sealed class AgentSettings
     {
@@ -56,36 +58,52 @@ namespace OfficeCliAgent.Core
             s.UiDir = Environment.GetEnvironmentVariable("OFFICECLI_AGENT_UI_DIR") ?? s.UiDir;
             s.NodePath = Environment.GetEnvironmentVariable("OFFICECLI_AGENT_NODE") ?? s.NodePath;
 
-            var repo = FindRepoRoot();
-            if (string.IsNullOrEmpty(s.HostDir) && repo != null) s.HostDir = Path.Combine(repo, "packages", "host");
-            if (string.IsNullOrEmpty(s.UiDir) && repo != null) s.UiDir = Path.Combine(repo, "packages", "ui", "dist");
-
+            // The first-run file never contains resolved directories: resolution happens on
+            // every load, so the same file keeps working after a reinstall or an uninstall.
             Directory.CreateDirectory(DataDir);
             if (!File.Exists(ConfigPath))
             {
-                try { File.WriteAllText(ConfigPath, JsonConvert.SerializeObject(s, Formatting.Indented)); }
+                try { File.WriteAllText(ConfigPath, SerializeDefaults(s)); }
                 catch (Exception ex) { Log.Write("settings: failed to write defaults: " + ex.Message); }
             }
+
+            var layout = FindLayout();
+            if (string.IsNullOrEmpty(s.HostDir) && layout != null) s.HostDir = layout.HostDir;
+            if (string.IsNullOrEmpty(s.UiDir) && layout != null) s.UiDir = layout.UiDir;
+            Log.Write("settings: layout " + (layout == null ? "none" : layout.IsRepository ? "repository" : "installed")
+                + " host=" + (s.HostDir ?? "(unset)") + " ui=" + (s.UiDir ?? "(unset)"));
             return s;
         }
 
+        /// <summary>JSON written on first run: user-settable fields only, directories left unset.</summary>
+        public static string SerializeDefaults(AgentSettings s)
+        {
+            var copy = new AgentSettings
+            {
+                Port = s.Port,
+                NodePath = s.NodePath,
+                HostDir = null,
+                UiDir = null,
+                AutoStartHost = s.AutoStartHost,
+                HostIdleExitSeconds = s.HostIdleExitSeconds,
+            };
+            return JsonConvert.SerializeObject(copy, Formatting.Indented);
+        }
+
+        [JsonIgnore]
         public string HostCliPath => string.IsNullOrEmpty(HostDir) ? null : Path.Combine(HostDir, "dist", "cli.js");
+        [JsonIgnore]
         public string UiEntryPath => string.IsNullOrEmpty(UiDir) ? null : Path.Combine(UiDir, "taskpane.html");
 
-        /// <summary>Walk up from the add-in assembly looking for the repository root.</summary>
-        private static string FindRepoRoot()
+        /// <summary>Walk up from the add-in assembly looking for a repository or installed layout.</summary>
+        private static InstallLayout.Result FindLayout()
         {
             try
             {
                 var dir = Path.GetDirectoryName(new Uri(Assembly.GetExecutingAssembly().CodeBase).LocalPath);
-                for (var i = 0; i < 8 && dir != null; i++)
-                {
-                    if (File.Exists(Path.Combine(dir, "packages", "host", "dist", "cli.js"))) return dir;
-                    dir = Path.GetDirectoryName(dir);
-                }
+                return InstallLayout.Find(dir, File.Exists);
             }
-            catch { /* ignore */ }
-            return null;
+            catch { return null; }
         }
     }
 

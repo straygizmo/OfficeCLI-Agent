@@ -32,7 +32,12 @@ namespace OfficeCliAgent.Core
             var cli = _settings.HostCliPath;
             if (cli == null || !File.Exists(cli))
                 throw new FileNotFoundException(
-                    "Host not found. Build the repository (pnpm build) or set HostDir in " + AgentSettings.ConfigPath, cli ?? "(unset)");
+                    "Host not found. Reinstall OfficeCLI Agent, or (for development) run pnpm build and set HostDir in " + AgentSettings.ConfigPath, cli ?? "(unset)");
+
+            if (string.Equals(_settings.NodePath, "node", StringComparison.OrdinalIgnoreCase)
+                && FindOnPath("node.exe", Environment.GetEnvironmentVariable("PATH")) == null)
+                throw new FileNotFoundException(
+                    "Node.js was not found. Install Node.js 20.19 or later (x64) from https://nodejs.org/ and restart Office, or set NodePath in " + AgentSettings.ConfigPath, "node.exe");
 
             var args = $"\"{cli}\" --port {_settings.Port} --no-tls --idle-exit {_settings.HostIdleExitSeconds}";
             // The host outlives this Office process, so we must not hold pipes to it: a redirected
@@ -63,6 +68,23 @@ namespace OfficeCliAgent.Core
                 await Task.Delay(500, ct).ConfigureAwait(false);
             }
             throw new TimeoutException("Host did not start listening within 90 seconds. See " + AgentSettings.HostLogPath);
+        }
+
+        /// <summary>First PATH entry that contains <paramref name="fileName"/>, or null.</summary>
+        public static string FindOnPath(string fileName, string pathVariable)
+        {
+            foreach (var entry in (pathVariable ?? "").Split(';'))
+            {
+                var dir = entry.Trim().Trim('"');
+                if (dir.Length == 0) continue;
+                try
+                {
+                    var candidate = Path.Combine(dir, fileName);
+                    if (File.Exists(candidate)) return candidate;
+                }
+                catch { /* malformed PATH entry */ }
+            }
+            return null;
         }
 
         private static void TrimHostLog()

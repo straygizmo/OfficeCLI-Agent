@@ -37,8 +37,8 @@ namespace OfficeCliAgent.Core
             if (entry == null || !File.Exists(entry))
             {
                 ShowError(UiLanguage.T(
-                    "チャット UI が見つかりません。リポジトリで pnpm build を実行するか、" + AgentSettings.ConfigPath + " の UiDir を設定してください。",
-                    "Chat UI not found. Run pnpm build in the repository or set UiDir in " + AgentSettings.ConfigPath + ".")
+                    "チャット UI が見つかりません。OfficeCLI Agent を再インストールするか、開発時はリポジトリで pnpm build を実行して " + AgentSettings.ConfigPath + " の UiDir を設定してください。",
+                    "Chat UI not found. Reinstall OfficeCLI Agent, or (for development) run pnpm build and set UiDir in " + AgentSettings.ConfigPath + ".")
                     + "\n\n" + (entry ?? "(UiDir unset)"));
                 return;
             }
