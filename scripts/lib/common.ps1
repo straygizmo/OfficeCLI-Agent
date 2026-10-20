@@ -16,6 +16,18 @@ function Write-Step([string] $Text) {
     Write-Host "==> $Text" -ForegroundColor Cyan
 }
 
+# <RSAKeyValue><Modulus>…</Modulus><Exponent>…</Exponent></RSAKeyValue> from a signed
+# ClickOnce/VSTO manifest, in the exact form the VSTO inclusion list expects (no xmlns).
+function Get-ManifestPublicKey([string] $ManifestPath) {
+    [xml] $doc = Get-Content $ManifestPath -Raw
+    $ns = @{ ds = 'http://www.w3.org/2000/09/xmldsig#' }
+    $node = Select-Xml -Xml $doc -Namespace $ns -XPath '//ds:KeyValue/ds:RSAKeyValue' | Select-Object -First 1
+    if (-not $node) { throw "$ManifestPath has no RSAKeyValue signature; is the manifest signed?" }
+    $modulus = ($node.Node.GetElementsByTagName('Modulus') | Select-Object -First 1).InnerText
+    $exponent = ($node.Node.GetElementsByTagName('Exponent') | Select-Object -First 1).InnerText
+    "<RSAKeyValue><Modulus>$modulus</Modulus><Exponent>$exponent</Exponent></RSAKeyValue>"
+}
+
 function Invoke-Checked([scriptblock] $Command, [string] $Description) {
     & $Command
     if ($LASTEXITCODE -ne 0) {

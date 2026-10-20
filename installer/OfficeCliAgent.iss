@@ -87,6 +87,12 @@ Type: filesandordirs; Name: "{app}"
 [Code]
 const
   AddinKeyFmt = 'Software\Microsoft\Office\%s\Addins\OfficeCliAgent.%s';
+  { VSTO inclusion list: trusts a manifest URL + signing public key for the current user, which is
+    what Visual Studio does for F5. Without it the runtime shows "publisher cannot be verified". }
+  InclusionKeyFmt = 'Software\Microsoft\VSTO\Security\Inclusion\%s';
+  InclusionGuidWord = '{3A1C9F4E-6B2D-4E7A-8C5F-1D0B9E7A4C21}';
+  InclusionGuidExcel = '{5C8E2B7A-9D14-4F36-B0A2-7E6C3D1F8B42}';
+  InclusionGuidPowerPoint = '{8F2D6A1C-3E5B-47C9-A4D8-0B7E9C2F6A63}';
   WebView2ClientId = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
 
 function ForwardSlashes(const Path: String): String;
@@ -95,10 +101,40 @@ begin
   StringChangeEx(Result, '\', '/', True);
 end;
 
-{ file:///C:/Users/x/AppData/Local/Programs/OfficeCliAgent/addin/Word/OfficeCliAgent.Word.vsto|vstolocal }
+{ file:///C:/Users/x/AppData/Local/Programs/OfficeCliAgent/addin/Word/OfficeCliAgent.Word.vsto }
+function ManifestFileUrl(App: String): String;
+begin
+  Result := 'file:///' + ForwardSlashes(ExpandConstant('{app}')) + '/addin/' + App + '/OfficeCliAgent.' + App + '.vsto';
+end;
+
+{ The registry Manifest value: the file URL plus |vstolocal (load from the local folder). }
 function ManifestUrl(App: String): String;
 begin
-  Result := 'file:///' + ForwardSlashes(ExpandConstant('{app}')) + '/addin/' + App + '/OfficeCliAgent.' + App + '.vsto|vstolocal';
+  Result := ManifestFileUrl(App) + '|vstolocal';
+end;
+
+function InclusionGuid(App: String): String;
+begin
+  if App = 'Word' then Result := InclusionGuidWord
+  else if App = 'Excel' then Result := InclusionGuidExcel
+  else Result := InclusionGuidPowerPoint;
+end;
+
+procedure WriteInclusionEntry(App: String);
+var
+  Key, KeyFile: String;
+  PublicKey: AnsiString;
+begin
+  Key := Format(InclusionKeyFmt, [InclusionGuid(App)]);
+  KeyFile := ExpandConstant('{app}') + '\addin\' + App + '\OfficeCliAgent.' + App + '.publickey.txt';
+  if not LoadStringFromFile(KeyFile, PublicKey) then
+  begin
+    Log('Inclusion list: cannot read ' + KeyFile + '; Office will ask to trust the add-in once.');
+    Exit;
+  end;
+  RegWriteStringValue(HKCU, Key, 'Url', ManifestFileUrl(App));
+  RegWriteStringValue(HKCU, Key, 'PublicKey', String(PublicKey));
+  Log('Inclusion list: ' + Key + ' -> ' + ManifestFileUrl(App));
 end;
 
 function OfficeRunning: Boolean;
@@ -174,14 +210,36 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then
-    StopHost;
+    StopHost
+  else if CurStep = ssPostInstall then
+  begin
+    WriteInclusionEntry('Word');
+    WriteInclusionEntry('Excel');
+    WriteInclusionEntry('PowerPoint');
+  end;
+end;
+
+{ Delete Key only when its string value ValueName starts with Prefix (points inside this install). }
+procedure DeleteKeyIfOurs(const Key, ValueName, Prefix: String);
+var
+  Value: String;
+begin
+  if not RegQueryStringValue(HKCU, Key, ValueName, Value) then
+    Exit;
+  if CompareText(Copy(Value, 1, Length(Prefix)), Prefix) = 0 then
+  begin
+    Log('Removing ' + Key);
+    RegDeleteKeyIncludingSubkeys(HKCU, Key);
+  end
+  else
+    Log('Keeping ' + Key + ' (points elsewhere: ' + Value + ')');
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   Apps: TArrayOfString;
   I: Integer;
-  Key, Manifest, Prefix: String;
+  Prefix: String;
 begin
   if CurUninstallStep <> usUninstall then
     Exit;
@@ -193,16 +251,7 @@ begin
   Apps[2] := 'PowerPoint';
   for I := 0 to 2 do
   begin
-    Key := Format(AddinKeyFmt, [Apps[I], Apps[I]]);
-    if RegQueryStringValue(HKCU, Key, 'Manifest', Manifest) then
-    begin
-      if CompareText(Copy(Manifest, 1, Length(Prefix)), Prefix) = 0 then
-      begin
-        Log('Removing add-in registration ' + Key);
-        RegDeleteKeyIncludingSubkeys(HKCU, Key);
-      end
-      else
-        Log('Keeping add-in registration ' + Key + ' (points elsewhere: ' + Manifest + ')');
-    end;
+    DeleteKeyIfOurs(Format(AddinKeyFmt, [Apps[I], Apps[I]]), 'Manifest', Prefix);
+    DeleteKeyIfOurs(Format(InclusionKeyFmt, [InclusionGuid(Apps[I])]), 'Url', Prefix);
   end;
 end;

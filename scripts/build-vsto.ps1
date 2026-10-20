@@ -47,6 +47,12 @@ foreach ($app in $apps) {
         $name = $pattern -f $app
         if (-not (Test-Path (Join-Path $target $name))) { throw "addin\$app is missing $name" }
     }
+
+    # The installer trusts the add-in for the current user through the VSTO inclusion list
+    # (HKCU\Software\Microsoft\VSTO\Security\Inclusion), which needs the signing key's public
+    # part as <RSAKeyValue> XML. Extract it from the signed deployment manifest.
+    $key = Get-ManifestPublicKey (Join-Path $target "OfficeCliAgent.$app.vsto")
+    Set-Content (Join-Path $target "OfficeCliAgent.$app.publickey.txt") $key -NoNewline -Encoding ascii
 }
 
 Write-Step "Add-ins staged under $StagingDir\addin"
