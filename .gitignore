@@ -16,3 +16,6 @@ vsto/**/packages/
 
 # VSTO signing certificates (private keys; Visual Studio can create a new test certificate)
 *.pfx
+
+# superpowers plan workspace (scratch)
+.superpowers/
