@@ -247,11 +247,11 @@ Expected: `Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"` is `True`
 
 - [ ] **Step 2: Write `installer/OfficeCliAgent.iss`**
 
-`[Setup]`: `AppId={{2F6C1C0E-7B2A-4D6B-9E0C-OFFICECLIAGENT}` (replace with a real GUID generated once with `[guid]::NewGuid()` and keep it fixed forever), `AppName=OfficeCLI Agent`, `AppVersion={#AppVersion}`, `AppPublisher=straygizmo`, `AppPublisherURL=https://github.com/straygizmo/OfficeCLI-Agent`, `DefaultDirName={localappdata}\Programs\OfficeCliAgent`, `DisableProgramGroupPage=yes`, `PrivilegesRequired=lowest`, `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `OutputDir={#OutputDir}`, `OutputBaseFilename=OfficeCliAgent-Setup-{#AppVersion}`, `Compression=lzma2/ultra64`, `SolidCompression=yes`, `LZMAUseSeparateProcess=yes`, `UninstallDisplayName=OfficeCLI Agent`, `CloseApplications=no` (Office is checked in code instead), `LicenseFile={#StagingDir}\..\..\..\LICENSE` (or pass `/DRepoRoot`).
+`[Setup]`: `AppId={{7D3B5E2A-4C1F-4A8E-9B6D-2E5F0C7A9D11}` (fixed forever; upgrades depend on it), `AppName=OfficeCLI Agent`, `AppVersion={#AppVersion}`, `AppPublisher=straygizmo`, `AppPublisherURL=https://github.com/straygizmo/OfficeCLI-Agent`, `DefaultDirName={localappdata}\Programs\OfficeCliAgent`, `DisableProgramGroupPage=yes`, `PrivilegesRequired=lowest`, `ArchitecturesAllowed=x64compatible`, `ArchitecturesInstallIn64BitMode=x64compatible`, `OutputDir={#OutputDir}`, `OutputBaseFilename=OfficeCliAgent-Setup-{#AppVersion}`, `Compression=lzma2/ultra64`, `SolidCompression=yes`, `LZMAUseSeparateProcess=yes`, `UninstallDisplayName=OfficeCLI Agent`, `CloseApplications=no` (Office is checked in code instead), `LicenseFile={#RepoRoot}\LICENSE`.
 
 `[Languages]`: `english` (`compiler:Default.isl`) and `japanese` (`compiler:Languages\Japanese.isl`).
 
-`[Files]`: `{#StagingDir}\addin\*` → `{app}\addin` recursesubdirs; `{#StagingDir}\host\*` → `{app}\host` recursesubdirs; `{#StagingDir}\ui\*` → `{app}\ui` recursesubdirs; `LICENSE` → `{app}`.
+`[Files]`: `{#StagingDir}\addin\*` → `{app}\addin` recursesubdirs; `{#StagingDir}\host\*` → `{app}\host` recursesubdirs; `{#StagingDir}\ui\*` → `{app}\ui` recursesubdirs; `{#RepoRoot}\LICENSE` → `{app}`.
 
 `[Registry]`: for each of `Word`, `Excel`, `PowerPoint`, root `HKCU`, subkey `Software\Microsoft\Office\<App>\Addins\OfficeCliAgent.<App>`: `Description` string `OfficeCLI Agent`, `FriendlyName` string `OfficeCLI Agent`, `LoadBehavior` dword `3`, `Manifest` string `{code:ManifestUrl|<App>}`. No `uninsdeletekey` flag.
 
