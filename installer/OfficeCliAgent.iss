@@ -82,7 +82,10 @@ Root: HKCU; Subkey: "Software\Microsoft\Office\PowerPoint\Addins\OfficeCliAgent.
 Root: HKCU; Subkey: "Software\Microsoft\Office\PowerPoint\Addins\OfficeCliAgent.PowerPoint"; ValueType: string; ValueName: "Manifest"; ValueData: "{code:ManifestUrl|PowerPoint}"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{app}"
+; Only our own subfolders: a user may have pointed the installer at an existing directory.
+Type: filesandordirs; Name: "{app}\addin"
+Type: filesandordirs; Name: "{app}\host"
+Type: filesandordirs; Name: "{app}\ui"
 
 [Code]
 const
@@ -158,14 +161,23 @@ begin
   end;
 end;
 
-{ Stop a host (node host\dist\cli.js) started from this install directory so its files are not locked. }
+{ A PowerShell single-quoted literal: only the quote itself needs doubling. }
+function PsQuoted(const S: String): String;
+begin
+  Result := S;
+  StringChangeEx(Result, '''', '''''', True);
+  Result := '''' + Result + '''';
+end;
+
+{ Stop a host (node host\dist\cli.js) started from this install directory so its files are not locked.
+  The path is matched with IndexOf (no wildcard syntax) so spaces, quotes and brackets are literal. }
 procedure StopHost;
 var
   Cmd: String;
   ResultCode: Integer;
 begin
-  Cmd := '-NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq ''node.exe'' -and $_.CommandLine -like ''*'
-       + ExpandConstant('{app}') + '\host\dist\cli.js*'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"';
+  Cmd := '-NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq ''node.exe'' -and $_.CommandLine -and $_.CommandLine.IndexOf('
+       + PsQuoted(ExpandConstant('{app}') + '\host\dist\cli.js') + ', [System.StringComparison]::OrdinalIgnoreCase) -ge 0 } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"';
   Log('StopHost: powershell.exe ' + Cmd);
   Exec('powershell.exe', Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;

@@ -28,8 +28,10 @@ function Get-ManifestPublicKey([string] $ManifestPath) {
     "<RSAKeyValue><Modulus>$modulus</Modulus><Exponent>$exponent</Exponent></RSAKeyValue>"
 }
 
-function Invoke-Checked([scriptblock] $Command, [string] $Description) {
-    & $Command
+# Runs a native command, shows its output on the host (never in the caller's pipeline),
+# and throws when it exits non-zero. -ArgumentList is available inside the block as $args.
+function Invoke-Checked([scriptblock] $Command, [string] $Description, [object[]] $ArgumentList = @()) {
+    & $Command @ArgumentList 2>&1 | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "$Description failed (exit code $LASTEXITCODE)"
     }
