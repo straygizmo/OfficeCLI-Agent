@@ -12,6 +12,15 @@ An open-source AI agent **VSTO add-in** for Word / Excel / PowerPoint (Windows d
 
 The task pane and ribbon follow the Office UI language: Japanese in Japanese environments, English everywhere else.
 
+## Install
+
+1. Download `OfficeCliAgent-Setup-<version>.exe` from the [latest release](https://github.com/straygizmo/OfficeCLI-Agent/releases/latest) and run it. It installs per user (no administrator rights) into `%LOCALAPPDATA%\Programs\OfficeCliAgent` and registers the Word / Excel / PowerPoint add-ins. Close Office first.
+2. The installer is not code-signed, so Windows SmartScreen shows "Windows protected your PC". Click **More info** → **Run anyway**. The add-ins are trusted for your user account by the installer, so Office does not ask again.
+3. Install the things the installer does not bundle (see [Requirements](#requirements-windows)): Node.js, OfficeCLI, and either a Copilot sign-in or a BYOK key.
+4. Open Word, Excel or PowerPoint and click **Agent** in the **OfficeCLI** group at the right end of the Home tab.
+
+Uninstall from Settings → Apps. Your settings and logs in `%LOCALAPPDATA%\OfficeCliAgent` and `%USERPROFILE%\.officecli-agent` are kept.
+
 ## How it works
 
 ```
@@ -47,14 +56,23 @@ For Excel only, existing sheets are never replaced: the agent either adds a shee
 
 ## Requirements (Windows)
 
-- Microsoft 365 / Office 2021 or later for Windows
-- Visual Studio 2022 with the "Office/SharePoint development" workload (to build the VSTO add-ins)
-- Microsoft Edge WebView2 Runtime
-- Node.js 20.19 or later, pnpm 9
-- [GitHub Copilot CLI](https://github.com/github/copilot-cli) (`copilot` on PATH). To use Copilot models, run `copilot` once and sign in. **Not needed for BYOK only.**
-- [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) (`officecli` on PATH: `irm https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.ps1 | iex`)
+To use the installed add-in:
 
-## Setup
+- Windows 10/11 **x64**, Microsoft 365 / Office 2021 or later for Windows
+- Microsoft Edge WebView2 Runtime (normally present on Windows 11 / Microsoft 365)
+- [Node.js](https://nodejs.org/) 20.19 or later, **x64** build (`node` on PATH). The installer warns if it is missing.
+- [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) (`officecli` on PATH: `irm https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.ps1 | iex`). Optional but recommended: without it the advanced document tools are disabled.
+- A model to talk to, one of:
+  - **BYOK** (verified): your own OpenAI / Azure OpenAI / Anthropic / Ollama key or local model, set up in the task pane. See [BYOK](#byok-your-own-api-keys--local-models).
+  - **GitHub Copilot subscription**: the Copilot runtime itself is bundled in the installer, so the standalone CLI is only needed to sign in once: `npm install -g @github/copilot`, then `copilot login`. This path has not been exercised on a fresh machine yet; if the task pane reports an authentication error, use BYOK and open an issue.
+
+To build from source (and to build the installer):
+
+- Visual Studio 2022 with the "Office/SharePoint development" workload
+- pnpm 9
+- Inno Setup 6 (`winget install --id JRSoftware.InnoSetup -e`) for the installer
+
+## Setup (from source)
 
 ```powershell
 pnpm install
@@ -95,11 +113,18 @@ Add `&lang=ja` or `&lang=en` to the URL to force the UI language; otherwise the 
 
 ### Add-in: `%LOCALAPPDATA%\OfficeCliAgent\addin.json`
 
-Port, path to `node`, host/UI folders, and whether to auto-start the host. When omitted, the repository is located from the add-in DLL's location. See [vsto/README.md](vsto/README.md) for details.
+Port, path to `node`, host/UI folders, and whether to auto-start the host. When omitted, the host and UI are located from the add-in DLL's location: next to it in an installed copy (`host\`, `ui\`), or in the repository checkout. See [vsto/README.md](vsto/README.md) for details.
 
 ## BYOK (your own API keys / local models)
 
 Register providers from the task pane under "Settings → BYOK providers → Add" (presets: OpenAI / Anthropic / Azure OpenAI / Ollama / LM Studio). They are saved in the host's `config.json`, and API keys are never sent back to the task pane. You can also edit the file directly.
+
+First run with your own key:
+
+1. Open Word, Excel or PowerPoint and click **Agent** on the Home tab to open the task pane.
+2. Click the gear icon → **BYOK providers** → **Add**.
+3. Pick a preset (for example OpenAI), paste the API key, enter a model ID (for example `gpt-6-luna`), and save.
+4. Back in the settings, choose the new provider as the active provider. The next request uses it.
 
 ```json
 {
@@ -146,6 +171,14 @@ By default (`--render auto`), OfficeCLI's `view … screenshot` / `stats` render
 - The host binds only to `127.0.0.1` and has no authentication. Other processes on the same PC can connect to it.
 - Not supported on Office on the web / Mac / iPad (requires VSTO and a local host).
 
+## Releasing (maintainers)
+
+1. Bump `version` in the root `package.json` and commit on `main` with a clean tree.
+2. Run `pwsh scripts/release.ps1`. It runs `pnpm install` / `pnpm build`, stages the host with `pnpm deploy` and the UI, builds the three VSTO solutions in Release with MSBuild, compiles `installer/OfficeCliAgent.iss` with Inno Setup into `dist/installer/OfficeCliAgent-Setup-<version>.exe` (plus a `.sha256`), tags `v<version>`, pushes the tag and publishes a GitHub Release with the installer attached. `-Draft` creates a draft, `-NoRelease` only builds the installer, `-AllowDirty` builds from any branch for local testing.
+3. Needs Visual Studio 2022 with the Office workload (the VSTO manifests are signed with the project's test certificates at build time), Inno Setup 6, pnpm, and `gh auth login`.
+
+Notes: the installer is x64 only and unsigned. Building the VSTO projects in Release re-registers your own development add-ins to `bin\Release`; press F5 in Visual Studio to switch back to Debug. Releases have so far been verified only on the maintainer's PC, not on a clean machine.
+
 ## Credits
 
 This project is built on the following open-source software:
@@ -155,7 +188,7 @@ This project is built on the following open-source software:
 - [office-agents](https://github.com/hewliyang/office-agents) (hewliyang, MIT) — inspiration for embedding a BYOK agent in an Office add-in.
 - [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) — hosts the task pane UI.
 
-OfficeCLI and the GitHub Copilot SDK must be installed separately and are not bundled with this repository. Follow each project's license and terms of use.
+OfficeCLI is not bundled and must be installed separately. The installer bundles the GitHub Copilot SDK and its runtime as npm dependencies of the host. Follow each project's license and terms of use.
 
 ## License
 

@@ -56,7 +56,7 @@ OfficeCliAgent.PowerPoint/OfficeCliAgent.PowerPoint.sln  PowerPoint (PowerPointO
 }
 ```
 
-`HostDir` / `UiDir` を省略すると、アドイン DLL の場所から上位へ辿ってリポジトリ（`packages/host/dist/cli.js`）を探します。VSTO の出力は `vsto\OfficeCliAgent.Word\bin\Debug\` なので、リポジトリ内で開発している限り自動で見つかります。
+`HostDir` / `UiDir` を省略すると、アドイン DLL の場所から上位へ辿ってリポジトリ（`packages/host/dist/cli.js`）か、インストール版のレイアウト（`addin\<App>` の隣の `host\dist\cli.js` と `ui\taskpane.html`）を探します（`InstallLayout.cs`）。VSTO の出力は `vsto\OfficeCliAgent.Word\bin\Debug\` なので、リポジトリ内で開発している限り自動で見つかります。初回生成の `addin.json` にはパスを書き込まないので、同じファイルのまま開発版とインストール版を切り替えられます。
 
 ログ: `%LOCALAPPDATA%\OfficeCliAgent\addin.log`（アドインが起動したホストの出力は同じフォルダの `host.log`）。
 
@@ -74,4 +74,4 @@ OfficeCliAgent.PowerPoint/OfficeCliAgent.PowerPoint.sln  PowerPoint (PowerPointO
 - Word の `exportFile` は本文範囲のエクスポートです。文書プロパティや一部の設定は複製されません。
 - PowerPoint の `importFile` は常に挿入先テーマを適用します（`keepSourceFormatting` は無視して結果に明記）。
 - 汎用スクリプト実行（Office.js の代替として Roslyn で C# を実行する `office_run_csharp`）は未実装です。必要になったら `Microsoft.CodeAnalysis.CSharp.Scripting` を Core に追加して `IOfficeOps` に 1 ケース足すだけで入ります。
-- 配布は ClickOnce（VSTO 標準）を想定。Node ホストと UI の同梱は未対応で、現状はリポジトリのビルド成果物を参照します。
+- 配布は `installer/OfficeCliAgent.iss`（Inno Setup）で、Node ホスト（node_modules 込み）と UI を同梱し、レジストリで `|vstolocal` 登録 + VSTO の Inclusion list で信頼付与します。`scripts/release.ps1` を参照。

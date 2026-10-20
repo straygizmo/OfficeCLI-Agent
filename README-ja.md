@@ -12,6 +12,15 @@ Word / Excel / PowerPoint（Windows デスクトップ版）に組み込む、�
 
 タスクペインとリボンの表示言語は Office の UI 言語に合わせて切り替わります（日本語環境では日本語、それ以外は英語）。
 
+## インストール
+
+1. [最新のリリース](https://github.com/straygizmo/OfficeCLI-Agent/releases/latest) から `OfficeCliAgent-Setup-<version>.exe` をダウンロードして実行します。管理者権限は不要で、`%LOCALAPPDATA%\Programs\OfficeCliAgent` に展開し、Word / Excel / PowerPoint のアドインを登録します。実行前に Office を終了してください。
+2. インストーラはコード署名していないため、Windows SmartScreen の「Windows によって PC が保護されました」が表示されます。**詳細情報** → **実行** をクリックしてください。アドイン自体はインストーラがユーザー単位で信頼登録するので、Office 側で追加の確認は出ません。
+3. インストーラに同梱されないもの（[前提](#前提-windows) を参照）を用意します: Node.js、OfficeCLI、そして Copilot のサインインか BYOK のキーのどちらか。
+4. Word / Excel / PowerPoint を開き、ホーム タブ右端の **OfficeCLI** グループの **Agent** をクリックします。
+
+アンインストールは「設定 → アプリ」から行えます。`%LOCALAPPDATA%\OfficeCliAgent` と `%USERPROFILE%\.officecli-agent` にある設定とログは残ります。
+
 ## 仕組み
 
 ```
@@ -46,14 +55,23 @@ Excel だけは既存シートを差し替えず「シート追加」または�
 
 ## 前提 (Windows)
 
-- Windows 版 Microsoft 365 / Office 2021 以降
-- Visual Studio 2022 + 「Office/SharePoint 開発」ワークロード（VSTO アドインのビルド用）
-- Microsoft Edge WebView2 ランタイム
-- Node.js 20.19 以上、pnpm 9
-- [GitHub Copilot CLI](https://github.com/github/copilot-cli)（`copilot` が PATH にある）。Copilot のモデルを使う場合は一度 `copilot` を起動してサインイン。**BYOK だけなら不要**
-- [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI)（`officecli` が PATH にある。`irm https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.ps1 | iex`）
+インストール版を使うには:
 
-## セットアップ
+- Windows 10/11 **x64**、Windows 版 Microsoft 365 / Office 2021 以降
+- Microsoft Edge WebView2 ランタイム（Windows 11 / Microsoft 365 環境なら通常入っています）
+- [Node.js](https://nodejs.org/) 20.19 以上の **x64** 版（`node` が PATH にある）。無い場合はインストーラが警告します
+- [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI)（`officecli` が PATH にある。`irm https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.ps1 | iex`）。任意ですが推奨: 無いと高度な文書編集ツールが無効になります
+- 使うモデルを次のどちらかで用意:
+  - **BYOK**（動作確認済み）: OpenAI / Azure OpenAI / Anthropic / Ollama などの自前キーやローカルモデルをタスクペインから登録します。[BYOK](#byok自前の-api-キー--ローカルモデル) を参照
+  - **GitHub Copilot のサブスクリプション**: Copilot のランタイム自体はインストーラに同梱されているので、単体の CLI はサインインにだけ使います。`npm install -g @github/copilot` のあと `copilot login` を一度実行してください。この経路はまだクリーンな PC で検証できていません。タスクペインに認証エラーが出る場合は BYOK を使い、issue で知らせてください
+
+ソースからビルドする（インストーラを作る）には:
+
+- Visual Studio 2022 + 「Office/SharePoint 開発」ワークロード
+- pnpm 9
+- Inno Setup 6（`winget install --id JRSoftware.InnoSetup -e`）
+
+## セットアップ（ソースから）
 
 ```powershell
 pnpm install
@@ -94,11 +112,18 @@ URL に `&lang=ja` / `&lang=en` を付けると表示言語を固定できます
 
 ### アドイン: `%LOCALAPPDATA%\OfficeCliAgent\addin.json`
 
-ポート、`node` のパス、ホスト/UI のフォルダ、自動起動の可否。省略時はアドイン DLL の位置からリポジトリを自動検出します。詳細は [vsto/README.md](vsto/README.md)。
+ポート、`node` のパス、ホスト/UI のフォルダ、自動起動の可否。省略時はアドイン DLL の位置から自動検出します（インストール版なら隣の `host\` と `ui\`、開発時はリポジトリ）。詳細は [vsto/README.md](vsto/README.md)。
 
 ## BYOK（自前の API キー / ローカルモデル）
 
 タスクペインの「設定 → BYOK プロバイダー → 追加」から登録できます（プリセット: OpenAI / Anthropic / Azure OpenAI / Ollama / LM Studio）。登録内容はホストの `config.json` に保存され、API キーはタスクペインには返されません。直接書いてもかまいません。
+
+自前キーで初めて使うときの手順:
+
+1. Word / Excel / PowerPoint を開き、ホーム タブの **Agent** でタスクペインを開きます。
+2. 歯車アイコン → **BYOK プロバイダー** → **追加** をクリックします。
+3. プリセット（例: OpenAI）を選び、API キーを貼り付け、モデル ID（例: `gpt-6-luna`）を入力して保存します。
+4. 設定に戻り、追加したプロバイダーを使用するプロバイダーとして選びます。次の依頼からそのモデルが使われます。
 
 ```json
 {
@@ -145,6 +170,14 @@ OfficeCLI の `view … screenshot` / `stats` は既定（`--render auto`）で 
 - ホストは `127.0.0.1` にのみバインドし、認証はありません。同一 PC 上の他プロセスからも接続できる点に留意してください。
 - Office on the web / Mac / iPad では動作しません（VSTO・ローカルホスト前提）。
 
+## リリース手順（メンテナー向け）
+
+1. ルートの `package.json` の `version` を上げ、クリーンな状態で `main` にコミットします。
+2. `pwsh scripts/release.ps1` を実行します。`pnpm install` / `pnpm build` → `pnpm deploy` でホストを、UI の dist をステージング → 3 つの VSTO ソリューションを MSBuild で Release ビルド → Inno Setup で `installer/OfficeCliAgent.iss` をコンパイルして `dist/installer/OfficeCliAgent-Setup-<version>.exe`（と `.sha256`）を生成 → タグ `v<version>` を作成して push → インストーラを添付した GitHub Release を公開、まで一気に行います。`-Draft` で下書き、`-NoRelease` でインストーラ作成のみ、`-AllowDirty` で任意のブランチからローカル確認用にビルドできます。
+3. 必要なもの: Visual Studio 2022 + Office ワークロード（VSTO のマニフェストはビルド時にプロジェクトのテスト証明書で署名されます）、Inno Setup 6、pnpm、`gh auth login` 済みの GitHub CLI。
+
+補足: インストーラは x64 専用で無署名です。VSTO プロジェクトを Release でビルドすると、自分の開発用アドイン登録が `bin\Release` に書き換わります。Visual Studio で F5 すれば Debug に戻ります。これまでのリリースはメンテナーの PC でのみ検証しており、クリーンな PC では未確認です。
+
 ## クレジット
 
 このプロジェクトは次のオープンソースの上に成り立っています。
@@ -154,7 +187,7 @@ OfficeCLI の `view … screenshot` / `stats` は既定（`--render auto`）で 
 - [office-agents](https://github.com/hewliyang/office-agents) (hewliyang, MIT) — Office アドインに BYOK エージェントを組み込むという設計の参考にしました。
 - [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) — タスクペインの UI ホスト。
 
-OfficeCLI と GitHub Copilot SDK はそれぞれ別途インストールが必要で、本リポジトリには同梱していません。各プロジェクトのライセンスと利用規約に従ってください。
+OfficeCLI は同梱しておらず、別途インストールが必要です。GitHub Copilot SDK とそのランタイムはホストの npm 依存としてインストーラに同梱されます。各プロジェクトのライセンスと利用規約に従ってください。
 
 ## ライセンス
 
