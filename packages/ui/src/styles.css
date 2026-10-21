@@ -114,4 +114,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 .panel-head .back { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: none; border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
 .panel-head .back:hover { background: var(--assistant); }
 .reload-row { display: flex; }
-.settings .hint { margin: -4px 0 0 22px; }
+.settings .hint { margin: -4px 0 0 40px; }
+/* Toggle switch (settings rows, menu items) */
+.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; user-select: none; }
+.toggle.disabled { opacity: 0.5; cursor: default; }
+.toggle input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.toggle-track { position: relative; flex-shrink: 0; width: 32px; height: 18px; border-radius: 999px; background: var(--border); transition: background 0.15s; }
+.toggle-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
+.toggle input:checked + .toggle-track { background: var(--accent); }
+.toggle input:checked + .toggle-track .toggle-knob { transform: translateX(14px); }
+.toggle input:focus-visible + .toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings .toggle { flex-direction: row; }

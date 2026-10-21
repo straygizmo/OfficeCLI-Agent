@@ -11,6 +11,7 @@ import {
   type SessionSettings,
 } from "@officecli-agent/protocol";
 import { ProviderEditor } from "./ProviderEditor";
+import { Toggle } from "./Toggle";
 import { HostClient, defaultHostUrl, isEmbeddedInWebView2, type ConnectionState } from "./host-client";
 import { t } from "./i18n";
 
@@ -468,22 +469,16 @@ export function App({ hostApp: initialHostApp }: Props) {
               />
             )}
           </div>
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={settings.session.autoApproveReadOnly ?? true}
-              onChange={(e) => updateSession({ autoApproveReadOnly: e.target.checked })}
-            />
-            {t.autoApproveReadOnly}
-          </label>
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={settings.session.workAcrossOpenFiles ?? false}
-              onChange={(e) => updateSession({ workAcrossOpenFiles: e.target.checked })}
-            />
-            {t.workAcrossOpenFiles}
-          </label>
+          <Toggle
+            checked={settings.session.autoApproveReadOnly ?? true}
+            onChange={(next) => updateSession({ autoApproveReadOnly: next })}
+            label={t.autoApproveReadOnly}
+          />
+          <Toggle
+            checked={settings.session.workAcrossOpenFiles ?? false}
+            onChange={(next) => updateSession({ workAcrossOpenFiles: next })}
+            label={t.workAcrossOpenFiles}
+          />
           <p className="muted small hint">{t.workAcrossOpenFilesHint[hostApp]}</p>
           {info && (
             <div className="info">
