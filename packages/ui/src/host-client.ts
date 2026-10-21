@@ -211,8 +211,12 @@ export class HostClient {
     return true;
   }
 
-  /** Start a fresh session (the host tears down the old one on a new hello). */
-  sendHello(): void {
-    this.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, hostApp: this.hostApp, locale, settings: this.settings() });
+  /**
+   * Start a fresh session (the host tears down the old one on a new hello).
+   * Pass `settings` when the caller just changed them: the settings callback reads React state that
+   * is only updated on the next render.
+   */
+  sendHello(settings?: SessionSettings): void {
+    this.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, hostApp: this.hostApp, locale, settings: settings ?? this.settings() });
   }
 }

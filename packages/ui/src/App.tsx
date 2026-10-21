@@ -112,6 +112,8 @@ export function App({ hostApp: initialHostApp }: Props) {
   // Settings the current session was started with (edits apply only after a new chat).
   const [activeSession, setActiveSession] = useState<SessionSettings>(settings.session);
   const listRef = useRef<HTMLDivElement>(null);
+  // Hosted tool progress is keyed by outputIndex within one response; bump per turn so rows never collide.
+  const turnRef = useRef(0);
   const clientRef = useRef<HostClient | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -121,6 +123,7 @@ export function App({ hostApp: initialHostApp }: Props) {
   const handleEvent = useCallback((event: AgentEvent) => {
     switch (event.kind) {
       case "turn.start":
+        turnRef.current += 1;
         setBusy(true);
         break;
       case "message.delta":
@@ -157,10 +160,14 @@ export function App({ hostApp: initialHostApp }: Props) {
         break;
       case "idle":
         setBusy(false);
+        // A hosted search whose "completed" event never arrived must not spin forever.
+        setItems((prev) => (prev.some((i) => i.role === "tool" && i.id.startsWith("server-tool-") && i.status === "running")
+          ? prev.map((i) => (i.role === "tool" && i.id.startsWith("server-tool-") && i.status === "running" ? { ...i, status: "ok" } : i))
+          : prev));
         break;
       case "server-tool":
         setItems((prev) => {
-          const id = `server-tool-${event.outputIndex}`;
+          const id = `server-tool-${turnRef.current}-${event.outputIndex}`;
           const status = event.status === "completed" ? "ok" : "running";
           const idx = prev.findIndex((i) => i.id === id);
           if (idx === -1) return [...prev, { id, role: "tool", toolName: t.searchingWeb, status }];
@@ -234,6 +241,19 @@ export function App({ hostApp: initialHostApp }: Props) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }, [settings]);
 
+  // WebView2 navigates to a file dropped anywhere outside the composer's drop handler; swallow those drops.
+  useEffect(() => {
+    const block = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+    };
+    window.addEventListener("dragover", block);
+    window.addEventListener("drop", block);
+    return () => {
+      window.removeEventListener("dragover", block);
+      window.removeEventListener("drop", block);
+    };
+  }, []);
+
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [items, permissions]);
@@ -269,16 +289,22 @@ export function App({ hostApp: initialHostApp }: Props) {
     const text = input.trim();
     if ((!text && pending.length === 0) || state !== "ready") return;
     const files = pending;
+    const attachments: AttachmentInput[] = [];
+    const shown: ShownAttachment[] = [];
+    try {
+      for (const p of files) {
+        attachments.push({ name: p.file.name, mimeType: mimeTypeOf(p.file), size: p.file.size, dataBase64: await readAsBase64(p.file) });
+        shown.push({ name: p.file.name, mimeType: mimeTypeOf(p.file), size: p.file.size, thumbnail: await makeThumbnail(p.file) });
+      }
+    } catch (err) {
+      // A dropped file that was moved or deleted since: keep the draft and the chips, tell the user.
+      setStatus(t.attachmentReadFailed((err as Error).message));
+      return;
+    }
+    for (const p of files) if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
     setPending([]);
     setInput("");
     setBusy(true);
-    const attachments: AttachmentInput[] = [];
-    const shown: ShownAttachment[] = [];
-    for (const p of files) {
-      attachments.push({ name: p.file.name, mimeType: mimeTypeOf(p.file), size: p.file.size, dataBase64: await readAsBase64(p.file) });
-      shown.push({ name: p.file.name, mimeType: mimeTypeOf(p.file), size: p.file.size, thumbnail: await makeThumbnail(p.file) });
-      if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
-    }
     append({ id: nextId(), role: "user", text, attachments: shown.length ? shown : undefined });
     clientRef.current?.send({ type: "chat.send", text, attachments: attachments.length ? attachments : undefined });
   };
@@ -333,7 +359,9 @@ export function App({ hostApp: initialHostApp }: Props) {
     setSettings({ ...settings, session });
     if (!items.some((i) => i.role === "user")) {
       setActiveSession(session);
-      clientRef.current?.sendHello();
+      settingsRef.current = { ...settings, session };
+      // The new settings are not in React state yet (no render has happened): pass them explicitly.
+      clientRef.current?.sendHello(session);
     } else {
       clientRef.current?.send({ type: "settings.update", settings: session });
       setStatus(t.webSearchNextChat);

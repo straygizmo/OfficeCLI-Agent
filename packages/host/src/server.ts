@@ -11,6 +11,7 @@ import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MAX_FILES, PROTOCOL_VERSION, WS_PATH, 
 import { AgentSession } from "./agent-session.js";
 import { deleteProvider, setMcpServerEnabled, setSkillEnabled, summarizeProviders, upsertProvider, type HostConfig } from "./config.js";
 import { TaskpaneLink } from "./taskpane-link.js";
+import { applyToggleToSessions } from "./toggles.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -194,12 +195,12 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
           return current;
         case "mcp.setEnabled":
           setMcpServerEnabled(config, message.name, message.enabled);
-          await current?.setMcpEnabled(message.name, message.enabled);
+          await applyToggleToSessions(sessions, "mcp", message.name, message.enabled);
           await broadcastCatalog();
           return current;
         case "skills.setEnabled":
           setSkillEnabled(config, message.name, message.enabled);
-          await current?.setSkillEnabled(message.name, message.enabled);
+          await applyToggleToSessions(sessions, "skill", message.name, message.enabled);
           await broadcastCatalog();
           return current;
         case "session.reset":
