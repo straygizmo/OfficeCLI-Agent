@@ -90,7 +90,7 @@ export class AgentSession {
       excludedTools: this.settings.webSearch === false ? [...WEB_TOOL_NAMES] : undefined,
       systemMessage: {
         mode: "append",
-        content: buildSystemPrompt(hostApp, this.workspaceDir, officecliAvailable, workAcrossOpenFiles),
+        content: buildSystemPrompt(hostApp, this.workspaceDir, officecliAvailable, workAcrossOpenFiles, this.settings.webSearch !== false),
       },
       onPermissionRequest: this.permissionHandler,
     });

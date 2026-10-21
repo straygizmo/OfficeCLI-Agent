@@ -180,7 +180,7 @@ function ItemRow({ name, detail, source, enabled, cliDisabled, onToggle }: { nam
         </span>
         {detail && <span className="menu-item-detail muted small">{detail}</span>}
       </span>
-      <Toggle checked={enabled} disabled={cliDisabled} onChange={onToggle} title={cliDisabled ? t.cliDisabledTip : undefined} />
+      <Toggle checked={enabled} disabled={cliDisabled} onChange={onToggle} ariaLabel={name} title={cliDisabled ? t.cliDisabledTip : undefined} />
     </div>
   );
 }

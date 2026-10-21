@@ -110,6 +110,7 @@ URL に `&lang=ja` / `&lang=en` を付けると表示言語を固定できます
 - `autoApproveReadOnly`: 読み取り専用のツール呼び出し（ファイル閲覧、OfficeCLI の読み取り系コマンド view/get/query/help/validate）を自動承認。シェル実行・ファイル書き換え・URL アクセスは常にタスクペインで承認を求めます。
 - `model`: Copilot のモデル ID（省略時は Copilot CLI の既定）。タスクペインの設定からも選べます（新しいセッションから有効）。
 - `copilotCliPath`: `copilot` が PATH にない場合の実行ファイルパス。
+- `disabledMcpServers` / `disabledSkills`: タスクペインの「+」メニューで OFF にした Copilot CLI の MCP サーバーとスキル（後述）。
 
 ### アドイン: `%LOCALAPPDATA%\OfficeCliAgent\addin.json`
 
@@ -143,6 +144,14 @@ URL に `&lang=ja` / `&lang=en` を付けると表示言語を固定できます
 - `apiKey` の代わりに `apiKeyEnv` で環境変数名を指定できます。ローカルモデルはキー不要。
 - BYOK ではモデル ID が必須です（プロバイダーの既定 `model`、またはタスクペインで入力）。
 - BYOK 時の利用量・レート制限はそのプロバイダー側のもので、Copilot のプレミアムリクエストは消費しません。ツール呼び出しを扱えるモデルを選んでください（Ollama なら Llama 3.1 以上、Qwen 2.5 系など）。
+
+## 入力欄のメニュー（「+」）
+
+メッセージ入力欄の左の「+」ボタンから、Claude のデスクトップアドインに似たメニューを開けます。
+
+- **ファイルや写真を追加** — ファイル選択ダイアログで添付します。エクスプローラーから入力欄へのドラッグ＆ドロップや、クリップボードの画像の貼り付けでも添付できます。1 メッセージにつき 5 ファイル・各 10 MB まで。画像（png/jpg/gif/webp/bmp）はモデルにそのまま見せ、Office ファイル・PDF・テキストはセッションの作業フォルダ（`attachments\`）に保存して、エージェントが officecli やファイルツールで読みます。添付した画像は `office_insert_image` で文書に挿入できます。
+- **Web を検索** — 既定で ON。OFF にすると Copilot の `web_search` / `web_fetch` ツールをセッションから外し、シェル経由でもインターネットにアクセスしないようエージェントに指示します。チャットがまだ空のうちは即時に反映され、メッセージ送信後の変更は次の新しいチャットから有効です。
+- **MCP サーバー** / **スキル** — GitHub Copilot CLI に設定済みの MCP サーバーとスキル（`~/.copilot/mcp-config.json`、`~/.copilot/skills`、ランタイム組み込みのスキル）をエージェントに読み込み、ここに一覧してスイッチで ON/OFF できます。OFF は実行中のチャットに即時反映され、以降のチャットにも記憶されます（ホストの `config.json` の `disabledMcpServers` / `disabledSkills`）。タスクペインが `~/.copilot` を書き換えることはありません。追加・削除は Copilot CLI 側で行ってください（`copilot mcp add …`、または `~/.copilot/skills` 配下に `SKILL.md` を含むフォルダを置く）。「Copilot CLI の設定を開く…」でその場所を Windows で開けます。
 
 ## 使い方の例
 
