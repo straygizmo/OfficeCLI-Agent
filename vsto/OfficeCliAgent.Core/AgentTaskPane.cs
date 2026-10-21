@@ -59,6 +59,8 @@ namespace OfficeCliAgent.Core
             }
 
             var core = _web.CoreWebView2;
+            // Files dragged from Explorer must reach the page's drop handler (attachments).
+            _web.AllowExternalDrop = true;
             core.SetVirtualHostNameToFolderMapping(VirtualHost, settings.UiDir, CoreWebView2HostResourceAccessKind.Allow);
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
