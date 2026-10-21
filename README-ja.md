@@ -48,6 +48,7 @@ OfficeCLI はディスク上のファイルしか扱えないため、「開い�
 |---|---|
 | セルの書き込み、文章の挿入・置換、スライドのテキスト | `excel_set_range` / `word_insert_text` / `ppt_set_shape_text` など（COM、即時反映・Undo 可） |
 | 他の Office ファイルの内容を取り込む | `officecli view/get` で確認 → `office_import_file` |
+| 同じアプリで開いている別のファイルを参照する（設定「開いている他のファイルも参照する」を有効にした新しいチャットから） | `office_list_open_documents` → `office_export_document(documentName)` → `officecli view/get`（読み取りのみ。編集できるのはアクティブな文書だけ） |
 | ピボット・変更履歴・アニメーション・数式・図など | `office_export_document` → `officecli` で編集 → `office_import_file` |
 | 文書の問題診断・見た目の確認 | `office_export_document` → `officecli view … issues / screenshot` |
 

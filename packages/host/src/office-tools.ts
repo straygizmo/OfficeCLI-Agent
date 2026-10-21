@@ -14,6 +14,8 @@ export interface OfficeToolContext {
   workspaceDir: string;
   allowedDirectories: string[];
   permissionTimeoutMs: number;
+  /** Expose the other documents open in the application (list + export copies). */
+  workAcrossOpenFiles: boolean;
 }
 
 const EXT: Record<HostApp, string> = { Word: "docx", Excel: "xlsx", PowerPoint: "pptx" };
@@ -79,20 +81,46 @@ export function createOfficeTools(ctx: OfficeToolContext): Tool<unknown>[] {
     description:
       `Save a copy of the LIVE ${ctx.hostApp} document (including unsaved changes) as a .${ext} file in the session workspace and return its absolute path. ` +
       "Use the path with the `officecli` tool (view text/outline/issues/screenshot, query, set, add, batch…) for OOXML-level inspection or editing, " +
-      "then bring changes back with office_import_file.",
+      "then bring changes back with office_import_file." +
+      (ctx.workAcrossOpenFiles ? ` Pass documentName to export another document open in ${ctx.hostApp} instead of the active one.` : ""),
     parameters: z.object({
       fileName: z.string().optional().describe("File name without extension. Defaults to the document name or 'current'."),
+      documentName: z
+        .string()
+        .optional()
+        .describe(
+          ctx.workAcrossOpenFiles
+            ? "Name or full path of another open document (from office_list_open_documents). Omit for the active document."
+            : "Leave empty: access to other open documents is turned off in the task pane settings.",
+        ),
     }),
     skipPermission: true,
-    handler: async ({ fileName }) => {
-      const fallback = ctx.documentName ? ctx.documentName.replace(/\.[^.]+$/, "") : "current";
+    handler: async ({ fileName, documentName }) => {
+      if (documentName && !ctx.workAcrossOpenFiles) {
+        return {
+          textResultForLlm: "Access to other open documents is turned off. Ask the user to enable 'Let the agent see other open files' in the task pane settings and start a new chat, or export the active document by omitting documentName.",
+          resultType: "failure" as const,
+        };
+      }
+      const source = documentName ?? ctx.documentName;
+      const fallback = source ? path.basename(source).replace(/\.[^.]+$/, "") : "current";
       const name = sanitizeFileName(fileName, fallback);
       const target = path.join(ctx.workspaceDir, `${name}.${ext}`);
       await fs.mkdir(ctx.workspaceDir, { recursive: true });
-      await ctx.link.runOffice({ kind: "exportFile", targetPath: target });
+      await ctx.link.runOffice({ kind: "exportFile", targetPath: target, documentName });
       const stat = await fs.stat(target);
       return `Exported to ${target} (${stat.size} bytes). Snapshot only: later edits to the live document are not reflected.`;
     },
+  });
+
+  const listOpenDocs = defineTool("office_list_open_documents", {
+    description:
+      `List the documents currently open in this ${ctx.hostApp} instance: name, path (null when never saved) and which one is active. ` +
+      "Only the active document can be edited live. To read another open document, export it with office_export_document(documentName) and inspect the copy with officecli; " +
+      "to bring its content into the active document, pass the exported copy to office_import_file.",
+    parameters: z.object({}),
+    skipPermission: true,
+    handler: async () => run({ kind: "listOpenDocuments" }),
   });
 
   const importFile = defineTool("office_import_file", {
@@ -186,7 +214,14 @@ export function createOfficeTools(ctx: OfficeToolContext): Tool<unknown>[] {
     }),
   });
 
-  const common: Tool<unknown>[] = [getContext, exportDoc, importFile, insertImage, workspaceInfo] as Tool<unknown>[];
+  const common: Tool<unknown>[] = [
+    getContext,
+    exportDoc,
+    ...(ctx.workAcrossOpenFiles ? [listOpenDocs] : []),
+    importFile,
+    insertImage,
+    workspaceInfo,
+  ] as Tool<unknown>[];
 
   // ---- Word ---------------------------------------------------------------
 

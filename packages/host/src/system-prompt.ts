@@ -1,6 +1,6 @@
 import type { HostApp } from "@officecli-agent/protocol";
 
-export function buildSystemPrompt(hostApp: HostApp, workspaceDir: string, officecliAvailable: boolean): string {
+export function buildSystemPrompt(hostApp: HostApp, workspaceDir: string, officecliAvailable: boolean, workAcrossOpenFiles = false): string {
   const liveTools: Record<HostApp, string> = {
     Word: "word_get_selection, word_insert_text, word_replace_text",
     Excel: "excel_list_sheets, excel_get_range, excel_set_range",
@@ -20,6 +20,11 @@ export function buildSystemPrompt(hostApp: HostApp, workspaceDir: string, office
     "- office_get_document_context: start here to see what is open and selected.",
     `- Live edit tools (${liveTools[hostApp]}): direct, undoable edits to the open document.`,
     `- office_export_document: save a snapshot of the live document to the workspace (${workspaceDir}) for OOXML-level work.`,
+    ...(workAcrossOpenFiles
+      ? [
+          `- office_list_open_documents: the other files open in ${hostApp}. When the user refers to another open file, list them, export the one they mean with office_export_document(documentName) and read the copy with officecli. Only the active document can be edited live; bring content across with office_import_file.`,
+        ]
+      : []),
     officecliAvailable
       ? "- officecli: read/analyze/edit .docx/.xlsx/.pptx files on disk with high fidelity. Pass a raw command line, e.g. `view report.docx outline`, `view deck.pptx issues --json`, `view deck.pptx screenshot -o out.png --page 1`, `get budget.xlsx /Sheet1 --depth 1 --json`, `add deck.pptx / --type slide --prop title=\"Q4\"`, `batch file.docx --input ops.json`. Run `help <docx|xlsx|pptx> <set|add|query>` when unsure. Always use absolute paths. Never try to drive the running Office application from a shell (COM/PowerShell automation) — it crashes the host app; use the live tools or officecli instead."
       : "- officecli is NOT installed on this PC; tell the user to install it (https://github.com/iOfficeAI/OfficeCLI) for advanced document operations.",

@@ -44,6 +44,8 @@ export class AgentSession {
     const { client, config, link, hostApp, documentName, locale, officecliAvailable } = this.opts;
     await fs.mkdir(this.workspaceDir, { recursive: true });
 
+    // Fixed for the lifetime of the session (tools and prompt are registered once); a change applies to the next new chat.
+    const workAcrossOpenFiles = this.settings.workAcrossOpenFiles ?? false;
     const tools = createOfficeTools({
       hostApp,
       documentName,
@@ -52,6 +54,7 @@ export class AgentSession {
       workspaceDir: this.workspaceDir,
       allowedDirectories: config.allowedDirectories,
       permissionTimeoutMs: config.permissionTimeoutSeconds * 1000,
+      workAcrossOpenFiles,
     });
 
     const { provider, model } = this.resolveProvider();
@@ -78,7 +81,7 @@ export class AgentSession {
       tools,
       systemMessage: {
         mode: "append",
-        content: buildSystemPrompt(hostApp, this.workspaceDir, officecliAvailable),
+        content: buildSystemPrompt(hostApp, this.workspaceDir, officecliAvailable, workAcrossOpenFiles),
       },
       onPermissionRequest: this.permissionHandler,
     });

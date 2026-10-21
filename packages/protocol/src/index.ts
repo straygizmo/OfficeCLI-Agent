@@ -62,8 +62,13 @@ export interface InsertImageOptions {
 export type OfficeOp =
   // ---- common ----
   | { kind: "getContext" }
-  /** Save a copy of the live document to `targetPath` (the add-in writes the file). */
-  | { kind: "exportFile"; targetPath: string }
+  /**
+   * Save a copy of the live document to `targetPath` (the add-in writes the file).
+   * `documentName` picks another document open in the same application instead of the active one.
+   */
+  | { kind: "exportFile"; targetPath: string; documentName?: string }
+  /** List the documents open in this application instance (see OpenDocumentSummary). */
+  | { kind: "listOpenDocuments" }
   | { kind: "importFile"; path: string; options?: ImportOptions }
   /** Insert a picture file (embedded, not linked) into the live document. */
   | { kind: "insertImage"; path: string; options?: InsertImageOptions }
@@ -86,6 +91,16 @@ export interface DocumentContext {
   /** Full path of the document on disk, if saved. */
   fullName?: string;
   summary: string;
+}
+
+/** One entry of a `listOpenDocuments` result. */
+export interface OpenDocumentSummary {
+  name: string;
+  /** Full path on disk; null for a document that was never saved. */
+  path: string | null;
+  saved: boolean;
+  /** True for the document the task pane is attached to (the one the live tools edit). */
+  active: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +149,11 @@ export interface SessionSettings {
   model?: string;
   /** Auto-approve read-only tool calls without asking the user. Default true. */
   autoApproveReadOnly?: boolean;
+  /**
+   * Let the agent list the other documents open in the same application and export copies of them
+   * (read-only access; only the active document is edited live). Default false. Applies to new sessions.
+   */
+  workAcrossOpenFiles?: boolean;
 }
 
 export type ClientMessage =

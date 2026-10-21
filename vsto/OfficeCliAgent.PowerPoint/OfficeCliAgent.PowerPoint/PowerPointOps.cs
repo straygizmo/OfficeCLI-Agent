@@ -36,7 +36,8 @@ namespace OfficeCliAgent.PowerPoint
             switch (kind)
             {
                 case "getContext": return GetContext();
-                case "exportFile": return ExportFile(Ops.Str(op, "targetPath"));
+                case "exportFile": return ExportFile(Ops.Str(op, "targetPath"), Ops.Str(op, "documentName"));
+                case "listOpenDocuments": return ListOpenDocuments();
                 case "importFile": return ImportFile(Ops.Str(op, "path"), Ops.Options(op));
                 case "insertImage": return InsertImage(Ops.Str(op, "path"), Ops.Options(op));
                 case "ppt.setShapeText": return SetShapeText(Ops.Int(op, "slide") ?? 0, Ops.Str(op, "shape"), Ops.Str(op, "text", ""));
@@ -108,13 +109,31 @@ namespace OfficeCliAgent.PowerPoint
             return Ops.Context(HostApp, pres.Name, saved ? pres.FullName : null, sb.ToString());
         }
 
-        private JToken ExportFile(string targetPath)
+        private JToken ListOpenDocuments()
+        {
+            var activeName = _app.Presentations.Count > 0 ? _app.ActivePresentation.FullName : null;
+            var list = new JArray();
+            foreach (Interop.Presentation p in _app.Presentations)
+                list.Add(Ops.OpenDocument(p.Name, p.FullName, p.FullName == activeName));
+            return list;
+        }
+
+        /// <summary>The active presentation, or the open presentation the agent named (listOpenDocuments names or paths).</summary>
+        private Interop.Presentation FindPresentation(string documentName)
+        {
+            if (string.IsNullOrEmpty(documentName)) return Pres;
+            foreach (Interop.Presentation p in _app.Presentations)
+                if (Ops.NameMatches(documentName, p.Name, p.FullName)) return p;
+            throw new OfficeOpException("No open presentation named '" + documentName + "'. Use office_list_open_documents to see the open files.");
+        }
+
+        private JToken ExportFile(string targetPath, string documentName)
         {
             if (string.IsNullOrEmpty(targetPath)) throw new OfficeOpException("targetPath is required.");
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath));
             if (File.Exists(targetPath)) File.Delete(targetPath);
             // Do not embed fonts: unnecessary for a working copy and fragile with restricted (e.g. Japanese) fonts.
-            Pres.SaveCopyAs(targetPath, Interop.PpSaveAsFileType.ppSaveAsOpenXMLPresentation);
+            FindPresentation(documentName).SaveCopyAs(targetPath, Interop.PpSaveAsFileType.ppSaveAsOpenXMLPresentation);
             return new JObject { ["path"] = targetPath };
         }
 

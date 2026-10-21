@@ -142,6 +142,7 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
               provider: message.settings?.provider ?? config.defaultProvider,
               model: message.settings?.model ?? config.model,
               autoApproveReadOnly: message.settings?.autoApproveReadOnly ?? config.autoApproveReadOnly,
+              workAcrossOpenFiles: message.settings?.workAcrossOpenFiles ?? false,
             },
             workspaceDir: next.workspaceDir,
             allowedDirectories: config.allowedDirectories,
@@ -158,8 +159,8 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
           return current;
         case "settings.update":
           current?.updateSettings(message.settings);
-          if (message.settings.model !== undefined || message.settings.provider !== undefined) {
-            link.status("Provider/model changes apply to the next new session (use Reset).");
+          if (message.settings.model !== undefined || message.settings.provider !== undefined || message.settings.workAcrossOpenFiles !== undefined) {
+            link.status("Provider, model and open-file access changes apply to the next new chat.");
           }
           return current;
         case "provider.save":

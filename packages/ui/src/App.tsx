@@ -25,6 +25,46 @@ interface Props {
 }
 
 const SETTINGS_KEY = "officecli-agent.settings";
+const HISTORY_KEY = "officecli-agent.history";
+const HISTORY_LIMIT = 50;
+
+/** A past conversation kept in this browser profile (the host does not remember it). */
+interface HistoryEntry {
+  id: string;
+  title: string;
+  updatedAt: number;
+  items: ChatItem[];
+}
+
+function loadHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) return JSON.parse(raw) as HistoryEntry[];
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
+function saveHistory(entries: HistoryEntry[]) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
+  } catch {
+    /* quota exceeded or storage disabled: history is best effort */
+  }
+}
+
+function conversationTitle(items: ChatItem[]): string {
+  const first = items.find((i) => i.role === "user");
+  const text = first && first.role === "user" ? first.text.trim().replace(/\s+/g, " ") : "";
+  return text.length > 60 ? `${text.slice(0, 60)}…` : text;
+}
+
+function formatTime(at: number): string {
+  const d = new Date(at);
+  const sameDay = new Date().toDateString() === d.toDateString();
+  return sameDay ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString();
+}
 
 function loadSettings(): { hostUrl: string; session: SessionSettings } {
   try {
@@ -55,7 +95,11 @@ export function App({ hostApp: initialHostApp }: Props) {
   const [status, setStatus] = useState<string>("");
   const [info, setInfo] = useState<{ workspaceDir: string; officecliAvailable: boolean; allowedDirectories: string[] } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  // Settings the current session was started with (edits apply only after a reset).
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
+  // Identity of the conversation on screen; a new chat gets a new id.
+  const [conversationId, setConversationId] = useState(nextId);
+  // Settings the current session was started with (edits apply only after a new chat).
   const [activeSession, setActiveSession] = useState<SessionSettings>(settings.session);
   const listRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<HostClient | null>(null);
@@ -169,6 +213,18 @@ export function App({ hostApp: initialHostApp }: Props) {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [items, permissions]);
 
+  // Keep the conversation on screen in local history once the agent is idle (no writes per streamed delta).
+  useEffect(() => {
+    if (busy || !items.some((i) => i.role === "user")) return;
+    const snapshot = items.map((i) => (i.role === "assistant" ? { ...i, streaming: false } : i));
+    setHistory((prev) => {
+      const entry: HistoryEntry = { id: conversationId, title: conversationTitle(snapshot), updatedAt: Date.now(), items: snapshot };
+      const next = [entry, ...prev.filter((e) => e.id !== conversationId)].slice(0, HISTORY_LIMIT);
+      saveHistory(next);
+      return next;
+    });
+  }, [items, busy, conversationId]);
+
   const send = () => {
     const text = input.trim();
     if (!text || state !== "ready") return;
@@ -180,12 +236,35 @@ export function App({ hostApp: initialHostApp }: Props) {
 
   const abort = () => clientRef.current?.send({ type: "chat.abort" });
 
-  const reset = () => {
-    setItems([]);
+  const startSession = (nextItems: ChatItem[], id: string) => {
+    setItems(nextItems);
+    setConversationId(id);
     setBusy(false);
     setPermissions([]);
+    setShowHistory(false);
     // A new hello makes the host drop the old session and start one with the current settings.
     clientRef.current?.sendHello();
+  };
+
+  const newChat = () => startSession([], nextId());
+
+  // Shows a past conversation again. The host session is fresh: the agent does not remember it.
+  const openHistoryEntry = (entry: HistoryEntry) => {
+    startSession(entry.items, entry.id);
+    setStatus(t.historyRestoredNote);
+  };
+
+  const deleteHistoryEntry = (id: string) => {
+    setHistory((prev) => {
+      const next = prev.filter((e) => e.id !== id);
+      saveHistory(next);
+      return next;
+    });
+  };
+
+  const clearHistory = () => {
+    saveHistory([]);
+    setHistory([]);
   };
 
   const answerPermission = (requestId: string, approved: boolean) => {
@@ -234,31 +313,88 @@ export function App({ hostApp: initialHostApp }: Props) {
           <span className={`badge ${state}`} title={stateTip}>
             {stateLabel}
           </span>
-          <button className="icon" onClick={() => window.location.reload()} title={t.reloadTitle} aria-label={t.reloadTitle}>
-            ↻
+          <button
+            onClick={() => {
+              setShowHistory((s) => !s);
+              setShowSettings(false);
+            }}
+            title={showHistory ? t.closeHistory : t.openHistory}
+            aria-label={t.history}
+            className={`icon${showHistory ? " active" : ""}`}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7.5V12l3 2" />
+            </svg>
           </button>
-          <button className="icon" onClick={reset} title={t.resetTitle} aria-label={t.reset}>
-            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v4.5M9.2 6.5v4.5" />
+          <button className="icon" onClick={newChat} title={t.newChatTitle} aria-label={t.newChat}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8.5v7M8.5 12h7" />
             </svg>
           </button>
           <button
-            onClick={() => setShowSettings((s) => !s)}
+            onClick={() => {
+              setShowSettings((s) => !s);
+              setShowHistory(false);
+            }}
             title={showSettings ? t.closeSettings : t.openSettings}
             aria-label={t.settings}
             className={`icon${showSettings ? " active" : ""}`}
           >
-            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="8" cy="8" r="2.2" />
-              <path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M3.4 12.6l1.3-1.3M11.3 4.7l1.3-1.3" />
-              <circle cx="8" cy="8" r="4.3" />
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
           </button>
         </div>
       </header>
 
+      {showHistory && (
+        <section className="history panel">
+          <div className="panel-head">
+            <button className="back" onClick={() => setShowHistory(false)} title={t.back} aria-label={t.back}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M11 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <h2>{t.history}</h2>
+            {history.length > 0 && (
+              <button className="small-btn" onClick={clearHistory}>
+                {t.clearHistory}
+              </button>
+            )}
+          </div>
+          {history.length === 0 ? (
+            <p className="muted small history-empty">{t.historyEmpty}</p>
+          ) : (
+            <ul className="history-list">
+              {history.map((entry) => (
+                <li key={entry.id} className={`history-row${entry.id === conversationId ? " current" : ""}`}>
+                  <button className="history-open" onClick={() => openHistoryEntry(entry)} title={entry.title}>
+                    <span className="history-title">{entry.title || t.untitledChat}</span>
+                    <span className="muted small">{formatTime(entry.updatedAt)}</span>
+                  </button>
+                  <button className="small-btn" onClick={() => deleteHistoryEntry(entry.id)} title={t.deleteChat} aria-label={t.deleteChat}>
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {showSettings && (
-        <section className="settings">
+        <section className="settings panel">
+          <div className="panel-head">
+            <button className="back" onClick={() => setShowSettings(false)} title={t.back} aria-label={t.back}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M11 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <h2>{t.settings}</h2>
+          </div>
           {!clientRef.current?.embedded && (
             <label>
               {t.hostUrl}
@@ -340,6 +476,15 @@ export function App({ hostApp: initialHostApp }: Props) {
             />
             {t.autoApproveReadOnly}
           </label>
+          <label className="row">
+            <input
+              type="checkbox"
+              checked={settings.session.workAcrossOpenFiles ?? false}
+              onChange={(e) => updateSession({ workAcrossOpenFiles: e.target.checked })}
+            />
+            {t.workAcrossOpenFiles}
+          </label>
+          <p className="muted small hint">{t.workAcrossOpenFilesHint[hostApp]}</p>
           {info && (
             <div className="info">
               <div>{t.workspaceDir}: <code>{info.workspaceDir}</code></div>
@@ -353,9 +498,9 @@ export function App({ hostApp: initialHostApp }: Props) {
             <code>~/.officecli-agent/config.json</code>
             {t.settingsNoteSuffix}
           </p>
-          <div className="row-end">
-            <button className="primary" onClick={() => setShowSettings(false)}>
-              {t.close}
+          <div className="reload-row">
+            <button onClick={() => window.location.reload()} title={t.reloadTitle}>
+              ↻ {t.reload}
             </button>
           </div>
           <p className="muted small credits">
@@ -368,6 +513,8 @@ export function App({ hostApp: initialHostApp }: Props) {
 
       {status && <div className="status">{status}</div>}
 
+      {!showSettings && !showHistory && (
+      <>
       <main className="chat" ref={listRef}>
         {items.length === 0 && (
           <div className="empty">
@@ -437,6 +584,8 @@ export function App({ hostApp: initialHostApp }: Props) {
           </div>
         </div>
       </footer>
+      </>
+      )}
     </div>
   );
 }

@@ -35,7 +35,8 @@ namespace OfficeCliAgent.Word
             switch (kind)
             {
                 case "getContext": return GetContext();
-                case "exportFile": return ExportFile(Ops.Str(op, "targetPath"));
+                case "exportFile": return ExportFile(Ops.Str(op, "targetPath"), Ops.Str(op, "documentName"));
+                case "listOpenDocuments": return ListOpenDocuments();
                 case "importFile": return ImportFile(Ops.Str(op, "path"), Ops.Options(op));
                 case "insertImage": return InsertImage(Ops.Str(op, "path"), Ops.Options(op));
                 case "word.getSelection": return GetSelection();
@@ -81,14 +82,32 @@ namespace OfficeCliAgent.Word
             try { return doc.ComputeStatistics(Interop.WdStatistic.wdStatisticPages); } catch { return -1; }
         }
 
-        private JToken ExportFile(string targetPath)
+        private JToken ListOpenDocuments()
+        {
+            var activeName = _app.Documents.Count > 0 ? _app.ActiveDocument.FullName : null;
+            var list = new JArray();
+            foreach (Interop.Document d in _app.Documents)
+                list.Add(Ops.OpenDocument(d.Name, d.FullName, d.FullName == activeName));
+            return list;
+        }
+
+        /// <summary>The active document, or the open document the agent named (listOpenDocuments names or paths).</summary>
+        private Interop.Document FindDocument(string documentName)
+        {
+            if (string.IsNullOrEmpty(documentName)) return Doc;
+            foreach (Interop.Document d in _app.Documents)
+                if (Ops.NameMatches(documentName, d.Name, d.FullName)) return d;
+            throw new OfficeOpException("No open Word document named '" + documentName + "'. Use office_list_open_documents to see the open files.");
+        }
+
+        private JToken ExportFile(string targetPath, string documentName)
         {
             if (string.IsNullOrEmpty(targetPath)) throw new OfficeOpException("targetPath is required.");
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath));
             if (File.Exists(targetPath)) File.Delete(targetPath);
             // ExportFragment writes the range (whole body here) as a standalone .docx without
             // changing the document's own path. Headers/footers and section layout travel with it.
-            Doc.Content.ExportFragment(targetPath, Interop.WdSaveFormat.wdFormatXMLDocument);
+            FindDocument(documentName).Content.ExportFragment(targetPath, Interop.WdSaveFormat.wdFormatXMLDocument);
             return new JObject { ["path"] = targetPath };
         }
 

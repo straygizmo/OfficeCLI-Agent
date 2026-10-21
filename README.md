@@ -49,6 +49,7 @@ OfficeCLI only works on files on disk, so for the open document the add-in write
 |---|---|
 | Write cells, insert/replace text, slide text | `excel_set_range` / `word_insert_text` / `ppt_set_shape_text`, etc. (COM, applied instantly, undoable) |
 | Bring in content from another Office file | Inspect with `officecli view/get` → `office_import_file` |
+| Read another file open in the same application (turn on "Let the agent see other open files" in the settings, then start a new chat) | `office_list_open_documents` → `office_export_document(documentName)` → `officecli view/get` (read-only; only the active document is edited) |
 | Pivots, tracked changes, animations, equations, diagrams, etc. | `office_export_document` → edit with `officecli` → `office_import_file` |
 | Diagnose document issues / check appearance | `office_export_document` → `officecli view … issues / screenshot` |
 

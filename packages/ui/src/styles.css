@@ -32,10 +32,10 @@ html, body, #root { height: 100%; margin: 0; }
 .topbar { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 .muted { color: var(--muted); }
 .small { font-size: 11px; }
-.actions button, .composer button, .permission button { border: 1px solid var(--border); background: transparent; color: var(--fg); padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+.actions button, .composer button, .permission button, .settings .reload-row button { border: 1px solid var(--border); background: transparent; color: var(--fg); padding: 4px 10px; border-radius: 4px; cursor: pointer; }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 button:disabled { opacity: 0.5; cursor: default; }
-.settings { padding: 8px 10px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; max-height: 70vh; overflow-y: auto; flex-shrink: 0; }
+.settings { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
 .settings label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
 .settings label.row { flex-direction: row; align-items: center; gap: 6px; }
 .settings input, .settings select { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); }
@@ -99,3 +99,19 @@ button:disabled { opacity: 0.5; cursor: default; }
 .input-action button.icon:hover:not(:disabled) { background: var(--assistant); }
 .input-action button.icon:disabled { color: var(--muted); opacity: 0.6; }
 .input-action button.icon.stop { color: var(--err); }
+.history { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.history-empty { margin: 0; }
+.history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.history-row { display: flex; align-items: center; gap: 4px; border-radius: 6px; }
+.history-row:hover { background: var(--assistant); }
+.history-row.current .history-title { font-weight: 600; }
+.history-open { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: none; background: transparent; color: var(--fg); font: inherit; font-size: 12px; padding: 5px 6px; border-radius: 6px; cursor: pointer; text-align: left; }
+.history-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-row .small-btn { margin: 0 2px 0 0; line-height: 1; }
+.panel { flex: 1; min-height: 0; overflow-y: auto; }
+.panel-head { display: flex; align-items: center; gap: 8px; padding: 2px 0 6px; }
+.panel-head h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
+.panel-head .back { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: none; border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+.panel-head .back:hover { background: var(--assistant); }
+.reload-row { display: flex; }
+.settings .hint { margin: -4px 0 0 22px; }

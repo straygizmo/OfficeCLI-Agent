@@ -87,6 +87,39 @@ namespace OfficeCliAgent.Core
             return text.Length <= max ? text : text.Substring(0, max) + "…";
         }
 
+        /// <summary>True when an Office FullName points at a file on disk (unsaved documents report just their name).</summary>
+        public static bool IsSaved(string fullName)
+        {
+            return fullName != null && (fullName.Contains("\\") || fullName.Contains("/"));
+        }
+
+        /// <summary>One entry of a listOpenDocuments result (protocol OpenDocumentSummary).</summary>
+        public static JObject OpenDocument(string name, string fullName, bool active)
+        {
+            var saved = IsSaved(fullName);
+            return new JObject
+            {
+                ["name"] = name,
+                // Explicit JSON null: a null string becomes a String-typed JValue, which callers would mistake for text.
+                ["path"] = saved ? (JToken)fullName : JValue.CreateNull(),
+                ["saved"] = saved,
+                ["active"] = active,
+            };
+        }
+
+        /// <summary>
+        /// Whether <paramref name="wanted"/> (as typed by the agent) designates the open document with the
+        /// given Name/FullName: exact name, full path, file name of the path, or name without extension.
+        /// </summary>
+        public static bool NameMatches(string wanted, string name, string fullName)
+        {
+            if (string.IsNullOrEmpty(wanted)) return false;
+            var cmp = StringComparison.OrdinalIgnoreCase;
+            if (string.Equals(wanted, name, cmp) || string.Equals(wanted, fullName, cmp)) return true;
+            if (IsSaved(fullName) && string.Equals(wanted, System.IO.Path.GetFileName(fullName), cmp)) return true;
+            return name != null && string.Equals(wanted, System.IO.Path.GetFileNameWithoutExtension(name), cmp);
+        }
+
         public static JObject Context(string hostApp, string documentName, string fullName, string summary)
         {
             return new JObject

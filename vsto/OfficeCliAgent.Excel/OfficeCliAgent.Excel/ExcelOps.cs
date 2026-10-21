@@ -37,7 +37,8 @@ namespace OfficeCliAgent.Excel
             switch (kind)
             {
                 case "getContext": return GetContext();
-                case "exportFile": return ExportFile(Ops.Str(op, "targetPath"));
+                case "exportFile": return ExportFile(Ops.Str(op, "targetPath"), Ops.Str(op, "documentName"));
+                case "listOpenDocuments": return ListOpenDocuments();
                 case "importFile": return ImportFile(Ops.Str(op, "path"), Ops.Options(op));
                 case "insertImage": return InsertImage(Ops.Str(op, "path"), Ops.Options(op));
                 case "excel.listSheets": return ListSheets();
@@ -98,12 +99,30 @@ namespace OfficeCliAgent.Excel
             return Ops.Context(HostApp, book.Name, saved ? book.FullName : null, sb.ToString());
         }
 
-        private JToken ExportFile(string targetPath)
+        private JToken ListOpenDocuments()
+        {
+            var activeName = _app.Workbooks.Count > 0 ? _app.ActiveWorkbook.FullName : null;
+            var list = new JArray();
+            foreach (Interop.Workbook b in _app.Workbooks)
+                list.Add(Ops.OpenDocument(b.Name, b.FullName, b.FullName == activeName));
+            return list;
+        }
+
+        /// <summary>The active workbook, or the open workbook the agent named (listOpenDocuments names or paths).</summary>
+        private Interop.Workbook FindWorkbook(string documentName)
+        {
+            if (string.IsNullOrEmpty(documentName)) return Book;
+            foreach (Interop.Workbook b in _app.Workbooks)
+                if (Ops.NameMatches(documentName, b.Name, b.FullName)) return b;
+            throw new OfficeOpException("No open workbook named '" + documentName + "'. Use office_list_open_documents to see the open files.");
+        }
+
+        private JToken ExportFile(string targetPath, string documentName)
         {
             if (string.IsNullOrEmpty(targetPath)) throw new OfficeOpException("targetPath is required.");
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath));
             if (File.Exists(targetPath)) File.Delete(targetPath);
-            Book.SaveCopyAs(targetPath);
+            FindWorkbook(documentName).SaveCopyAs(targetPath);
             return new JObject { ["path"] = targetPath };
         }
 
