@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { CopilotClient, RuntimeConnection, type ModelInfo } from "@github/copilot-sdk";
 import { WebSocketServer, type WebSocket } from "ws";
-import { PROTOCOL_VERSION, WS_PATH, isClientMessage, type ClientMessage, type ModelSummary } from "@officecli-agent/protocol";
+import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MAX_FILES, PROTOCOL_VERSION, WS_PATH, isClientMessage, type ClientMessage, type ModelSummary } from "@officecli-agent/protocol";
 import { AgentSession } from "./agent-session.js";
 import { deleteProvider, summarizeProviders, upsertProvider, type HostConfig } from "./config.js";
 import { TaskpaneLink } from "./taskpane-link.js";
@@ -63,7 +63,8 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
 
   const taskpaneDir = resolveTaskpaneDir();
   const httpServer = createHttpServer(config, (req, res) => serveStatic(req, res, taskpaneDir, config.serveTaskpane));
-  const wss = new WebSocketServer({ server: httpServer, path: WS_PATH });
+  // Attachments arrive as base64 inside chat.send frames; allow the full batch plus slack.
+  const wss = new WebSocketServer({ server: httpServer, path: WS_PATH, maxPayload: Math.ceil((ATTACHMENT_MAX_FILES * ATTACHMENT_MAX_BYTES * 4) / 3) + 1024 * 1024 });
   const sessions = new Set<AgentSession>();
 
   // Idle shutdown: the VSTO add-in starts us with --idle-exit so we go away once
@@ -152,7 +153,7 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
         }
         case "chat.send":
           if (!current) throw new Error("Session not ready; send 'hello' first.");
-          await current.send(message.text);
+          await current.send(message.text, message.attachments);
           return current;
         case "chat.abort":
           await current?.abort();

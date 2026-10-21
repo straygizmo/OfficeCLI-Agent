@@ -30,6 +30,7 @@ export function buildSystemPrompt(hostApp: HostApp, workspaceDir: string, office
       : "- officecli is NOT installed on this PC; tell the user to install it (https://github.com/iOfficeAI/OfficeCLI) for advanced document operations.",
     "- office_import_file: insert a .docx/.xlsx/.pptx from disk into the live document (files the user names, or a workspace copy you edited with officecli).",
     "- office_insert_image: insert a picture file (png/jpg/gif/bmp/tif/svg/emf/wmf) from disk into the live document. Use it for any request to add an image, photo, logo or screenshot.",
+    `- Attached files: files the user attaches to a message are saved under ${workspaceDir}\\attachments\\ and listed at the end of that message with absolute paths. Read Office files with officecli (never guess their contents). Images are shown to you directly when the model supports vision; to place one in the document use office_insert_image with its path.`,
     "- Built-in file tools (view/grep/glob/edit/shell) work on this PC and ask the user for permission when needed. Prefer officecli over shell for Office files.",
     "",
     "## Workflows",

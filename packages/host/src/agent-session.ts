@@ -9,7 +9,8 @@ import type {
   ProviderConfig,
   SessionEvent,
 } from "@github/copilot-sdk";
-import { COPILOT_PROVIDER, type AgentEvent, type HostApp, type SessionSettings, type UiLocale } from "@officecli-agent/protocol";
+import { COPILOT_PROVIDER, type AgentEvent, type AttachmentInput, type HostApp, type SessionSettings, type UiLocale } from "@officecli-agent/protocol";
+import { saveAttachments, toMessageOptions } from "./attachments.js";
 import { resolveApiKey, type HostConfig } from "./config.js";
 import { createOfficeTools } from "./office-tools.js";
 import { createOfficecliTool } from "./officecli-tool.js";
@@ -93,9 +94,10 @@ export class AgentSession {
     return this.session?.sessionId ?? this.id;
   }
 
-  async send(text: string): Promise<void> {
+  async send(text: string, attachments: AttachmentInput[] = []): Promise<void> {
     if (!this.session) throw new Error("Session not started");
-    await this.session.send({ prompt: text });
+    const saved = attachments.length ? await saveAttachments(this.workspaceDir, attachments) : [];
+    await this.session.send(toMessageOptions(text, saved));
   }
 
   async abort(): Promise<void> {
@@ -181,6 +183,14 @@ export class AgentSession {
           success: event.data.success,
           output: event.data.result?.content?.slice(0, 4000),
           error: event.data.error?.message,
+        });
+        break;
+      case "assistant.server_tool_progress":
+        this.emit({
+          kind: "server-tool",
+          name: event.data.kind,
+          outputIndex: event.data.outputIndex,
+          status: event.data.status as "in_progress" | "searching" | "completed",
         });
         break;
       case "session.idle":

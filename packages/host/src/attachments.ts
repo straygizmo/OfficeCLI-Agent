@@ -70,3 +70,20 @@ export function attachmentFooter(saved: SavedAttachment[]): string {
   if (saved.length === 0) return "";
   return "\n\nAttached files (saved on disk):\n" + saved.map((s) => `- ${s.path} (${s.mimeType})`).join("\n");
 }
+
+export interface BlobAttachment {
+  type: "blob";
+  data: string;
+  mimeType: string;
+  displayName?: string;
+}
+
+/**
+ * Prompt text plus SDK attachments for one message. Documents are never passed to the runtime
+ * as file attachments (it would read binary files into the prompt); their paths in the footer
+ * are enough for officecli. Images go as blobs so a vision-capable model sees them.
+ */
+export function toMessageOptions(text: string, saved: SavedAttachment[]): { prompt: string; attachments: BlobAttachment[] | undefined } {
+  const blobs = saved.filter((s) => s.isImage).map<BlobAttachment>((s) => ({ type: "blob", data: s.dataBase64, mimeType: s.mimeType, displayName: s.name }));
+  return { prompt: text + attachmentFooter(saved), attachments: blobs.length ? blobs : undefined };
+}

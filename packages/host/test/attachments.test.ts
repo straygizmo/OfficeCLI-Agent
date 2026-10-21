@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ATTACHMENT_MAX_BYTES } from "@officecli-agent/protocol";
-import { attachmentFooter, isImageMime, sanitizeFileName, saveAttachments, uniquePath, validateAttachments } from "../src/attachments.js";
+import { attachmentFooter, isImageMime, sanitizeFileName, saveAttachments, toMessageOptions, uniquePath, validateAttachments } from "../src/attachments.js";
 
 const mkdtemp = () => fs.mkdtempSync(path.join(os.tmpdir(), "oca-att-"));
 
@@ -61,4 +61,15 @@ test("attachmentFooter lists absolute paths and mime types", () => {
   assert.equal(attachmentFooter([]), "");
   const text = attachmentFooter([{ name: "r.docx", path: "C:\\w\\attachments\\r.docx", mimeType: "application/x", size: 1, isImage: false, dataBase64: "" }]);
   assert.match(text, /^\n\nAttached files \(saved on disk\):\n- C:\\w\\attachments\\r\.docx \(application\/x\)$/);
+});
+
+test("toMessageOptions appends the footer and passes only images as blobs", () => {
+  const saved = [
+    { name: "r.docx", path: "C:\\w\\attachments\\r.docx", mimeType: "application/x", size: 1, isImage: false, dataBase64: "QQ==" },
+    { name: "p.png", path: "C:\\w\\attachments\\p.png", mimeType: "image/png", size: 1, isImage: true, dataBase64: "QkI=" },
+  ];
+  const out = toMessageOptions("look", saved);
+  assert.equal(out.prompt, "look" + attachmentFooter(saved));
+  assert.deepEqual(out.attachments, [{ type: "blob", data: "QkI=", mimeType: "image/png", displayName: "p.png" }]);
+  assert.deepEqual(toMessageOptions("hi", []), { prompt: "hi", attachments: undefined });
 });
