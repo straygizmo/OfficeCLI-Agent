@@ -204,6 +204,13 @@ export class HostClient {
     this.transport.send(JSON.stringify(message));
   }
 
+  /** Ask the add-in to open a file or folder in Windows. Returns false outside the task pane (nothing happens). */
+  openPath(path: string): boolean {
+    if (!this.embedded) return false;
+    window.chrome!.webview!.postMessage({ __bridge: "openPath", path });
+    return true;
+  }
+
   /** Start a fresh session (the host tears down the old one on a new hello). */
   sendHello(): void {
     this.send({ type: "hello", protocolVersion: PROTOCOL_VERSION, hostApp: this.hostApp, locale, settings: this.settings() });

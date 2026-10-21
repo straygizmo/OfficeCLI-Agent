@@ -3,6 +3,7 @@ import {
   COPILOT_PROVIDER,
   type AgentEvent,
   type ByokProviderInput,
+  type Catalog,
   type HostApp,
   type ModelSummary,
   type PermissionSummary,
@@ -10,6 +11,7 @@ import {
   type ServerMessage,
   type SessionSettings,
 } from "@officecli-agent/protocol";
+import { PlusMenu } from "./PlusMenu";
 import { ProviderEditor } from "./ProviderEditor";
 import { Toggle } from "./Toggle";
 import { HostClient, defaultHostUrl, isEmbeddedInWebView2, type ConnectionState } from "./host-client";
@@ -95,6 +97,8 @@ export function App({ hostApp: initialHostApp }: Props) {
   const [permissions, setPermissions] = useState<PermissionSummary[]>([]);
   const [status, setStatus] = useState<string>("");
   const [info, setInfo] = useState<{ workspaceDir: string; officecliAvailable: boolean; allowedDirectories: string[] } | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
@@ -168,6 +172,10 @@ export function App({ hostApp: initialHostApp }: Props) {
           setInfo({ workspaceDir: message.workspaceDir, officecliAvailable: message.officecliAvailable, allowedDirectories: message.allowedDirectories });
           setStatus(message.officecliAvailable ? "" : t.officecliMissing);
           setHostBuild(message.hostBuild ?? "");
+          setCatalog(message.catalog);
+          break;
+        case "catalog":
+          setCatalog(message.catalog);
           break;
         case "agent.event":
           handleEvent(message.event);
@@ -277,6 +285,33 @@ export function App({ hostApp: initialHostApp }: Props) {
     const session = { ...settings.session, ...patch };
     setSettings({ ...settings, session });
     clientRef.current?.send({ type: "settings.update", settings: session });
+  };
+
+  // Web search is a session-creation option: live right away only while the chat is still empty.
+  const setWebSearch = (next: boolean) => {
+    const session = { ...settings.session, webSearch: next };
+    setSettings({ ...settings, session });
+    if (!items.some((i) => i.role === "user")) {
+      setActiveSession(session);
+      clientRef.current?.sendHello();
+    } else {
+      clientRef.current?.send({ type: "settings.update", settings: session });
+      setStatus(t.webSearchNextChat);
+    }
+  };
+
+  const setMcpEnabled = (name: string, enabled: boolean) => {
+    clientRef.current?.send({ type: "mcp.setEnabled", name, enabled });
+    setCatalog((c) => (c ? { ...c, mcpServers: c.mcpServers.map((s) => (s.name === name ? { ...s, enabled } : s)) } : c));
+  };
+
+  const setSkillEnabled = (name: string, enabled: boolean) => {
+    clientRef.current?.send({ type: "skills.setEnabled", name, enabled });
+    setCatalog((c) => (c ? { ...c, skills: c.skills.map((s) => (s.name === name ? { ...s, enabled } : s)) } : c));
+  };
+
+  const openPath = (p: string) => {
+    if (!clientRef.current?.openPath(p)) setStatus(t.openPathHint(p));
   };
 
   const selectedProvider = providers.find((p) => p.name === (settings.session.provider ?? COPILOT_PROVIDER));
@@ -486,6 +521,12 @@ export function App({ hostApp: initialHostApp }: Props) {
               <div>officecli: {info.officecliAvailable ? t.officecliAvailable : t.officecliNotFound}</div>
               <div>{t.hostBuild}: {hostBuild || t.unknown}</div>
               <div>{t.allowedDirs}: {info.allowedDirectories.length ? info.allowedDirectories.join(", ") : t.allowedDirsNone}</div>
+              {catalog && (
+                <>
+                  <div>{t.copilotMcpConfig}: <code>{catalog.mcpConfigPath}</code></div>
+                  <div>{t.copilotSkillsDir}: <code>{catalog.skillsDir}</code></div>
+                </>
+              )}
             </div>
           )}
           <p className="muted small">
@@ -548,6 +589,18 @@ export function App({ hostApp: initialHostApp }: Props) {
       </main>
 
       <footer className="composer">
+        <input ref={fileInputRef} type="file" multiple hidden aria-hidden="true" tabIndex={-1} />
+        <div className="composer-row">
+        <PlusMenu
+          disabled={state !== "ready"}
+          webSearch={settings.session.webSearch ?? true}
+          onWebSearch={setWebSearch}
+          catalog={catalog}
+          onMcpToggle={setMcpEnabled}
+          onSkillToggle={setSkillEnabled}
+          onAddFiles={() => fileInputRef.current?.click()}
+          onOpenPath={openPath}
+        />
         <div className="input-wrap">
           <textarea
             value={input}
@@ -577,6 +630,7 @@ export function App({ hostApp: initialHostApp }: Props) {
               </button>
             )}
           </div>
+        </div>
         </div>
       </footer>
       </>
