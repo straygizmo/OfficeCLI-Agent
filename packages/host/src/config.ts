@@ -44,6 +44,10 @@ export interface HostConfig {
   serveTaskpane: boolean;
   /** Exit when no add-in has been connected for this many seconds (0 = run until killed). */
   idleExitSeconds: number;
+  /** Copilot CLI MCP servers switched off from the task pane (names from mcp-config.json / plugins). */
+  disabledMcpServers: string[];
+  /** Skills switched off from the task pane (names as the runtime reports them). */
+  disabledSkills: string[];
 }
 
 export const CONFIG_DIR = path.join(os.homedir(), ".officecli-agent");
@@ -62,6 +66,8 @@ const defaults: HostConfig = {
   permissionTimeoutSeconds: 180,
   serveTaskpane: false,
   idleExitSeconds: 0,
+  disabledMcpServers: [],
+  disabledSkills: [],
 };
 
 /** Command-line overrides: --port <n>, --tls / --no-tls, --serve-ui, --idle-exit <seconds>. */
@@ -97,6 +103,8 @@ export function loadConfig(overrides: Partial<HostConfig> = {}): HostConfig {
   merged.certDir = expandHome(merged.certDir);
   merged.workspaceRoot = expandHome(merged.workspaceRoot);
   merged.providers = Array.isArray(merged.providers) ? merged.providers : [];
+  merged.disabledMcpServers = Array.isArray(merged.disabledMcpServers) ? merged.disabledMcpServers : [];
+  merged.disabledSkills = Array.isArray(merged.disabledSkills) ? merged.disabledSkills : [];
   fs.mkdirSync(merged.workspaceRoot, { recursive: true });
   return merged;
 }
@@ -157,6 +165,35 @@ export function deleteProvider(config: HostConfig, name: string): void {
   config.providers = config.providers.filter((p) => p.name !== name);
   if (config.defaultProvider === name) config.defaultProvider = COPILOT_PROVIDER;
   saveConfig(config);
+}
+
+/** `list` with `name` present or absent, without duplicates, order kept. */
+export function withName(list: string[], name: string, present: boolean): string[] {
+  const without = list.filter((n) => n !== name);
+  return present ? (list.includes(name) ? list : [...list, name]) : without;
+}
+
+export function setMcpServerEnabled(config: HostConfig, name: string, enabled: boolean): void {
+  config.disabledMcpServers = withName(config.disabledMcpServers, name, !enabled);
+  saveConfig(config);
+}
+
+export function setSkillEnabled(config: HostConfig, name: string, enabled: boolean): void {
+  config.disabledSkills = withName(config.disabledSkills, name, !enabled);
+  saveConfig(config);
+}
+
+/** The Copilot CLI's configuration directory (never written by this host). */
+export function copilotHome(): string {
+  return process.env.COPILOT_HOME || path.join(os.homedir(), ".copilot");
+}
+
+export function copilotMcpConfigPath(): string {
+  return path.join(copilotHome(), "mcp-config.json");
+}
+
+export function copilotSkillsDir(): string {
+  return path.join(copilotHome(), "skills");
 }
 
 export function expandHome(p: string): string {
