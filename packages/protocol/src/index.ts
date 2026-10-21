@@ -110,6 +110,22 @@ export interface OpenDocumentSummary {
 /** Name of the built-in GitHub Copilot provider (uses the Copilot CLI login). */
 export const COPILOT_PROVIDER = "copilot";
 
+/** Attachment limits per chat message. */
+export const ATTACHMENT_MAX_FILES = 5;
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+/** Attachments with these MIME types are shown to the model as images; everything else goes by path. */
+export const IMAGE_MIME_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"];
+/** Runtime tool names removed from a session when web search is switched off. */
+export const WEB_TOOL_NAMES: readonly string[] = ["web_search", "web_fetch", "github-mcp-server-web_search"];
+
+/** A file attached to a chat message, carried as base64 inside the frame. */
+export interface AttachmentInput {
+  name: string;
+  mimeType: string;
+  size: number;
+  dataBase64: string;
+}
+
 export type ByokProviderType = "openai" | "azure" | "anthropic";
 
 /** A BYOK (bring-your-own-key) model provider, as edited from the task pane. */
@@ -154,6 +170,8 @@ export interface SessionSettings {
    * (read-only access; only the active document is edited live). Default false. Applies to new sessions.
    */
   workAcrossOpenFiles?: boolean;
+  /** Allow Copilot's web search / URL fetch tools. Default true. Applies to new sessions. */
+  webSearch?: boolean;
 }
 
 export type ClientMessage =
@@ -168,7 +186,7 @@ export type ClientMessage =
       locale?: UiLocale;
       settings?: SessionSettings;
     }
-  | { type: "chat.send"; text: string }
+  | { type: "chat.send"; text: string; attachments?: AttachmentInput[] }
   | { type: "chat.abort" }
   | { type: "office.result"; requestId: string; ok: true; result: unknown }
   | { type: "office.result"; requestId: string; ok: false; error: string }
@@ -176,7 +194,10 @@ export type ClientMessage =
   | { type: "settings.update"; settings: SessionSettings }
   | { type: "session.reset" }
   | { type: "provider.save"; provider: ByokProviderInput }
-  | { type: "provider.delete"; name: string };
+  | { type: "provider.delete"; name: string }
+  /** Switch a Copilot CLI MCP server / skill on or off (live for the running session, persisted for the next). */
+  | { type: "mcp.setEnabled"; name: string; enabled: boolean }
+  | { type: "skills.setEnabled"; name: string; enabled: boolean };
 
 // ---------------------------------------------------------------------------
 // Host -> task pane
@@ -187,6 +208,33 @@ export interface ModelSummary {
   name: string;
 }
 
+/** An MCP server known to the Copilot CLI (user config, plugin, built-in), with the pane's on/off state applied. */
+export interface McpServerSummary {
+  name: string;
+  type?: "stdio" | "http" | "sse";
+  source: string;
+  /** Effective state for new sessions: enabled in the CLI and not switched off from the pane. */
+  enabled: boolean;
+  /** Disabled in the CLI's own configuration; the pane cannot switch it on. */
+  cliDisabled: boolean;
+}
+
+export interface SkillSummary {
+  name: string;
+  description?: string;
+  source: string;
+  enabled: boolean;
+  cliDisabled: boolean;
+}
+
+/** What the session loaded from the Copilot CLI configuration, plus where that configuration lives. */
+export interface Catalog {
+  mcpServers: McpServerSummary[];
+  skills: SkillSummary[];
+  mcpConfigPath: string;
+  skillsDir: string;
+}
+
 export type AgentEvent =
   | { kind: "turn.start" }
   | { kind: "message.delta"; messageId: string; text: string }
@@ -195,7 +243,9 @@ export type AgentEvent =
   | { kind: "tool.start"; toolCallId: string; toolName: string; args?: unknown; mcpServer?: string }
   | { kind: "tool.complete"; toolCallId: string; toolName: string; success: boolean; output?: string; error?: string }
   | { kind: "idle" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string }
+  /** Progress of a provider-hosted tool such as Copilot's web search. */
+  | { kind: "server-tool"; name: string; outputIndex: number; status: "in_progress" | "searching" | "completed" };
 
 export interface PermissionSummary {
   requestId: string;
@@ -220,8 +270,10 @@ export type ServerMessage =
       workspaceDir: string;
       allowedDirectories: string[];
       officecliAvailable: boolean;
+      catalog: Catalog;
     }
   | { type: "providers"; providers: ProviderSummary[] }
+  | { type: "catalog"; catalog: Catalog }
   | { type: "office.request"; requestId: string; op: OfficeOp }
   | { type: "agent.event"; event: AgentEvent }
   | { type: "permission.request"; permission: PermissionSummary }
