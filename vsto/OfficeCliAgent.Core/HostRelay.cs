@@ -9,13 +9,18 @@ using Newtonsoft.Json.Linq;
 
 namespace OfficeCliAgent.Core
 {
+    /// <summary>What a frame posted by the page is, judged from its first bytes only.</summary>
+    public enum PageFrameKind { Bridge, Hello, Other }
+
     /// <summary>
     /// Bridges the chat page (WebView2) and the Node host (WebSocket).
     ///
-    /// Frames flow through unchanged in both directions, with two exceptions:
+    /// Frames flow through unchanged in both directions, with three exceptions:
     ///  * the page's <c>hello</c> is stamped with the real host application and document;
+    ///  * <c>{"__bridge":…}</c> control frames from the page are handled here (relay state, open a path);
     ///  * <c>office.request</c> frames from the host are executed here through COM
     ///    (on the Office UI thread) and answered with <c>office.result</c>.
+    /// Large chat frames (attachments) are never parsed here.
     /// </summary>
     public sealed class HostRelay : IDisposable
     {
@@ -83,30 +88,78 @@ namespace OfficeCliAgent.Core
             }
         }
 
+        /// <summary>
+        /// Cheap prefix test so that large frames (chat messages carrying base64 attachments) are
+        /// forwarded without ever being parsed inside the Office process.
+        /// </summary>
+        public static PageFrameKind ClassifyPageFrame(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return PageFrameKind.Other;
+            if (text.StartsWith("{\"__bridge\"", StringComparison.Ordinal)) return PageFrameKind.Bridge;
+            if (text.StartsWith("{\"type\":\"hello\"", StringComparison.Ordinal)) return PageFrameKind.Hello;
+            return PageFrameKind.Other;
+        }
+
+        /// <summary>The path itself when it exists, else its parent folder when that exists, else null.</summary>
+        public static string ResolveOpenTarget(string path, Func<string, bool> fileExists, Func<string, bool> dirExists)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            if (fileExists(path) || dirExists(path)) return path;
+            string parent;
+            try { parent = Path.GetDirectoryName(path); }
+            catch { return null; }
+            return parent != null && dirExists(parent) ? parent : null;
+        }
+
         /// <summary>Called for every message the page posts via window.chrome.webview.postMessage.</summary>
         public async Task OnPageMessageAsync(string text)
         {
-            if (string.IsNullOrEmpty(text)) return;
+            switch (ClassifyPageFrame(text))
+            {
+                case PageFrameKind.Other:
+                    if (string.IsNullOrEmpty(text)) return;
+                    await SendAsync(text).ConfigureAwait(false);
+                    return;
+                case PageFrameKind.Bridge:
+                    HandleBridgeFrame(text);
+                    return;
+                case PageFrameKind.Hello:
+                    JObject msg;
+                    try { msg = JObject.Parse(text); }
+                    catch { Log.Write("relay: malformed hello from page ignored"); return; }
+                    msg["hostApp"] = _ops.HostApp;
+                    msg["documentName"] = _ops.DocumentName;
+                    msg["officeVersion"] = _ops.OfficeVersion;
+                    await SendAsync(msg.ToString(Newtonsoft.Json.Formatting.None)).ConfigureAwait(false);
+                    return;
+            }
+        }
+
+        private void HandleBridgeFrame(string text)
+        {
             JObject msg;
             try { msg = JObject.Parse(text); }
-            catch { Log.Write("relay: non-JSON from page ignored"); return; }
-
+            catch { Log.Write("relay: malformed bridge frame ignored"); return; }
             var bridge = msg["__bridge"]?.ToString();
-            if (bridge != null)
+            switch (bridge)
             {
-                // Page (re)loaded: tell it the current relay state.
-                if (bridge == "ready") _postToPage(_connected ? "{\"__bridge\":\"open\"}" : "{\"__bridge\":\"closed\"}");
-                return;
+                case "ready":
+                    // Page (re)loaded: tell it the current relay state.
+                    _postToPage(_connected ? "{\"__bridge\":\"open\"}" : "{\"__bridge\":\"closed\"}");
+                    break;
+                case "openPath":
+                    OpenPath(msg["path"]?.ToString());
+                    break;
             }
+        }
 
-            if (msg["type"]?.ToString() == "hello")
-            {
-                msg["hostApp"] = _ops.HostApp;
-                msg["documentName"] = _ops.DocumentName;
-                msg["officeVersion"] = _ops.OfficeVersion;
-                text = msg.ToString(Newtonsoft.Json.Formatting.None);
-            }
-            await SendAsync(text).ConfigureAwait(false);
+        /// <summary>Open a file or folder with the Windows default handler (used for the Copilot CLI settings).</summary>
+        private static void OpenPath(string path)
+        {
+            var target = ResolveOpenTarget(path, File.Exists, Directory.Exists);
+            if (target == null) { Log.Write("relay: openPath: nothing to open for " + path); return; }
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target) { UseShellExecute = true }); }
+            catch (Exception ex) { Log.Write("relay: openPath failed: " + ex.Message); }
         }
 
         private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken ct)

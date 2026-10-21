@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   COPILOT_PROVIDER,
   type AgentEvent,
+  type AttachmentInput,
   type ByokProviderInput,
+  type Catalog,
   type HostApp,
   type ModelSummary,
   type PermissionSummary,
@@ -10,12 +12,16 @@ import {
   type ServerMessage,
   type SessionSettings,
 } from "@officecli-agent/protocol";
+import { AttachmentChips } from "./AttachmentChips";
+import { PlusMenu } from "./PlusMenu";
+import { acceptFiles, makeThumbnail, mimeTypeOf, readAsBase64, type PendingAttachment, type ShownAttachment } from "./attachments";
 import { ProviderEditor } from "./ProviderEditor";
+import { Toggle } from "./Toggle";
 import { HostClient, defaultHostUrl, isEmbeddedInWebView2, type ConnectionState } from "./host-client";
 import { t } from "./i18n";
 
 type ChatItem =
-  | { id: string; role: "user"; text: string }
+  | { id: string; role: "user"; text: string; attachments?: ShownAttachment[] }
   | { id: string; role: "assistant"; text: string; streaming: boolean }
   | { id: string; role: "tool"; toolName: string; args?: unknown; status: "running" | "ok" | "error"; output?: string; mcpServer?: string }
   | { id: string; role: "system"; text: string };
@@ -94,6 +100,10 @@ export function App({ hostApp: initialHostApp }: Props) {
   const [permissions, setPermissions] = useState<PermissionSummary[]>([]);
   const [status, setStatus] = useState<string>("");
   const [info, setInfo] = useState<{ workspaceDir: string; officecliAvailable: boolean; allowedDirectories: string[] } | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [dragOver, setDragOver] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
@@ -102,6 +112,8 @@ export function App({ hostApp: initialHostApp }: Props) {
   // Settings the current session was started with (edits apply only after a new chat).
   const [activeSession, setActiveSession] = useState<SessionSettings>(settings.session);
   const listRef = useRef<HTMLDivElement>(null);
+  // Hosted tool progress is keyed by outputIndex within one response; bump per turn so rows never collide.
+  const turnRef = useRef(0);
   const clientRef = useRef<HostClient | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -111,6 +123,7 @@ export function App({ hostApp: initialHostApp }: Props) {
   const handleEvent = useCallback((event: AgentEvent) => {
     switch (event.kind) {
       case "turn.start":
+        turnRef.current += 1;
         setBusy(true);
         break;
       case "message.delta":
@@ -147,6 +160,21 @@ export function App({ hostApp: initialHostApp }: Props) {
         break;
       case "idle":
         setBusy(false);
+        // A hosted search whose "completed" event never arrived must not spin forever.
+        setItems((prev) => (prev.some((i) => i.role === "tool" && i.id.startsWith("server-tool-") && i.status === "running")
+          ? prev.map((i) => (i.role === "tool" && i.id.startsWith("server-tool-") && i.status === "running" ? { ...i, status: "ok" } : i))
+          : prev));
+        break;
+      case "server-tool":
+        setItems((prev) => {
+          const id = `server-tool-${turnRef.current}-${event.outputIndex}`;
+          const status = event.status === "completed" ? "ok" : "running";
+          const idx = prev.findIndex((i) => i.id === id);
+          if (idx === -1) return [...prev, { id, role: "tool", toolName: t.searchingWeb, status }];
+          const copy = [...prev];
+          copy[idx] = { ...(copy[idx] as Extract<ChatItem, { role: "tool" }>), status };
+          return copy;
+        });
         break;
       case "error":
         setBusy(false);
@@ -167,6 +195,10 @@ export function App({ hostApp: initialHostApp }: Props) {
           setInfo({ workspaceDir: message.workspaceDir, officecliAvailable: message.officecliAvailable, allowedDirectories: message.allowedDirectories });
           setStatus(message.officecliAvailable ? "" : t.officecliMissing);
           setHostBuild(message.hostBuild ?? "");
+          setCatalog(message.catalog);
+          break;
+        case "catalog":
+          setCatalog(message.catalog);
           break;
         case "agent.event":
           handleEvent(message.event);
@@ -209,6 +241,19 @@ export function App({ hostApp: initialHostApp }: Props) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }, [settings]);
 
+  // WebView2 navigates to a file dropped anywhere outside the composer's drop handler; swallow those drops.
+  useEffect(() => {
+    const block = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+    };
+    window.addEventListener("dragover", block);
+    window.addEventListener("drop", block);
+    return () => {
+      window.removeEventListener("dragover", block);
+      window.removeEventListener("drop", block);
+    };
+  }, []);
+
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [items, permissions]);
@@ -225,13 +270,43 @@ export function App({ hostApp: initialHostApp }: Props) {
     });
   }, [items, busy, conversationId]);
 
-  const send = () => {
+  const addFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    const { next, error } = acceptFiles(pending, files);
+    setPending(next);
+    if (error) setStatus(error);
+  };
+
+  const removePending = (id: string) => {
+    setPending((prev) => {
+      const gone = prev.find((p) => p.id === id);
+      if (gone?.previewUrl) URL.revokeObjectURL(gone.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const send = async () => {
     const text = input.trim();
-    if (!text || state !== "ready") return;
-    append({ id: nextId(), role: "user", text });
-    clientRef.current?.send({ type: "chat.send", text });
+    if ((!text && pending.length === 0) || state !== "ready") return;
+    const files = pending;
+    const attachments: AttachmentInput[] = [];
+    const shown: ShownAttachment[] = [];
+    try {
+      for (const p of files) {
+        attachments.push({ name: p.file.name, mimeType: mimeTypeOf(p.file), size: p.file.size, dataBase64: await readAsBase64(p.file) });
+        shown.push({ name: p.file.name, mimeType: mimeTypeOf(p.file), size: p.file.size, thumbnail: await makeThumbnail(p.file) });
+      }
+    } catch (err) {
+      // A dropped file that was moved or deleted since: keep the draft and the chips, tell the user.
+      setStatus(t.attachmentReadFailed((err as Error).message));
+      return;
+    }
+    for (const p of files) if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+    setPending([]);
     setInput("");
     setBusy(true);
+    append({ id: nextId(), role: "user", text, attachments: shown.length ? shown : undefined });
+    clientRef.current?.send({ type: "chat.send", text, attachments: attachments.length ? attachments : undefined });
   };
 
   const abort = () => clientRef.current?.send({ type: "chat.abort" });
@@ -276,6 +351,35 @@ export function App({ hostApp: initialHostApp }: Props) {
     const session = { ...settings.session, ...patch };
     setSettings({ ...settings, session });
     clientRef.current?.send({ type: "settings.update", settings: session });
+  };
+
+  // Web search is a session-creation option: live right away only while the chat is still empty.
+  const setWebSearch = (next: boolean) => {
+    const session = { ...settings.session, webSearch: next };
+    setSettings({ ...settings, session });
+    if (!items.some((i) => i.role === "user")) {
+      setActiveSession(session);
+      settingsRef.current = { ...settings, session };
+      // The new settings are not in React state yet (no render has happened): pass them explicitly.
+      clientRef.current?.sendHello(session);
+    } else {
+      clientRef.current?.send({ type: "settings.update", settings: session });
+      setStatus(t.webSearchNextChat);
+    }
+  };
+
+  const setMcpEnabled = (name: string, enabled: boolean) => {
+    clientRef.current?.send({ type: "mcp.setEnabled", name, enabled });
+    setCatalog((c) => (c ? { ...c, mcpServers: c.mcpServers.map((s) => (s.name === name ? { ...s, enabled } : s)) } : c));
+  };
+
+  const setSkillEnabled = (name: string, enabled: boolean) => {
+    clientRef.current?.send({ type: "skills.setEnabled", name, enabled });
+    setCatalog((c) => (c ? { ...c, skills: c.skills.map((s) => (s.name === name ? { ...s, enabled } : s)) } : c));
+  };
+
+  const openPath = (p: string) => {
+    if (!clientRef.current?.openPath(p)) setStatus(t.openPathHint(p));
   };
 
   const selectedProvider = providers.find((p) => p.name === (settings.session.provider ?? COPILOT_PROVIDER));
@@ -468,22 +572,16 @@ export function App({ hostApp: initialHostApp }: Props) {
               />
             )}
           </div>
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={settings.session.autoApproveReadOnly ?? true}
-              onChange={(e) => updateSession({ autoApproveReadOnly: e.target.checked })}
-            />
-            {t.autoApproveReadOnly}
-          </label>
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={settings.session.workAcrossOpenFiles ?? false}
-              onChange={(e) => updateSession({ workAcrossOpenFiles: e.target.checked })}
-            />
-            {t.workAcrossOpenFiles}
-          </label>
+          <Toggle
+            checked={settings.session.autoApproveReadOnly ?? true}
+            onChange={(next) => updateSession({ autoApproveReadOnly: next })}
+            label={t.autoApproveReadOnly}
+          />
+          <Toggle
+            checked={settings.session.workAcrossOpenFiles ?? false}
+            onChange={(next) => updateSession({ workAcrossOpenFiles: next })}
+            label={t.workAcrossOpenFiles}
+          />
           <p className="muted small hint">{t.workAcrossOpenFilesHint[hostApp]}</p>
           {info && (
             <div className="info">
@@ -491,6 +589,12 @@ export function App({ hostApp: initialHostApp }: Props) {
               <div>officecli: {info.officecliAvailable ? t.officecliAvailable : t.officecliNotFound}</div>
               <div>{t.hostBuild}: {hostBuild || t.unknown}</div>
               <div>{t.allowedDirs}: {info.allowedDirectories.length ? info.allowedDirectories.join(", ") : t.allowedDirsNone}</div>
+              {catalog && (
+                <>
+                  <div>{t.copilotMcpConfig}: <code>{catalog.mcpConfigPath}</code></div>
+                  <div>{t.copilotSkillsDir}: <code>{catalog.skillsDir}</code></div>
+                </>
+              )}
             </div>
           )}
           <p className="muted small">
@@ -552,17 +656,66 @@ export function App({ hostApp: initialHostApp }: Props) {
         ))}
       </main>
 
-      <footer className="composer">
+      <footer
+        className={`composer${dragOver ? " drop-active" : ""}`}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          if (state === "ready") setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (state === "ready") addFiles(Array.from(e.dataTransfer.files));
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={(e) => {
+            addFiles(Array.from(e.target.files ?? []));
+            e.target.value = "";
+          }}
+        />
+        <div className="composer-row">
+        <PlusMenu
+          disabled={state !== "ready"}
+          webSearch={settings.session.webSearch ?? true}
+          onWebSearch={setWebSearch}
+          catalog={catalog}
+          onMcpToggle={setMcpEnabled}
+          onSkillToggle={setSkillEnabled}
+          onAddFiles={() => fileInputRef.current?.click()}
+          onOpenPath={openPath}
+        />
         <div className="input-wrap">
+          <AttachmentChips items={pending.map((p) => ({ id: p.id, name: p.file.name, size: p.file.size, previewUrl: p.previewUrl }))} onRemove={removePending} />
           <textarea
             value={input}
             placeholder={state === "ready" ? t.inputPlaceholder : t.inputDisabled}
             disabled={state !== "ready"}
             onChange={(e) => setInput(e.target.value)}
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData.items)
+                .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+                .map((it) => it.getAsFile())
+                .filter((f): f is File => f !== null);
+              if (files.length) {
+                e.preventDefault();
+                addFiles(files);
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                send();
+                void send();
               }
             }}
             rows={4}
@@ -575,13 +728,14 @@ export function App({ hostApp: initialHostApp }: Props) {
                 </svg>
               </button>
             ) : (
-              <button className="icon" onClick={send} disabled={state !== "ready" || !input.trim()} title={t.send} aria-label={t.send}>
+              <button className="icon" onClick={() => void send()} disabled={state !== "ready" || (!input.trim() && pending.length === 0)} title={t.send} aria-label={t.send}>
                 <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true">
                   <path d="M1.7 2.2a.6.6 0 0 1 .8-.7l11.8 5.9a.7.7 0 0 1 0 1.2L2.5 14.5a.6.6 0 0 1-.8-.7L3 8.6h5.2a.6.6 0 0 0 0-1.2H3L1.7 2.2z" />
                 </svg>
               </button>
             )}
           </div>
+        </div>
         </div>
       </footer>
       </>
@@ -594,7 +748,12 @@ function ChatRow({ item }: { item: ChatItem }) {
   const [open, setOpen] = useState(false);
   switch (item.role) {
     case "user":
-      return <div className="msg user">{item.text}</div>;
+      return (
+        <div className="msg user">
+          {item.text}
+          {item.attachments && <AttachmentChips items={item.attachments} />}
+        </div>
+      );
     case "assistant":
       return <div className={`msg assistant${item.streaming ? " streaming" : ""}`}>{item.text}</div>;
     case "system":

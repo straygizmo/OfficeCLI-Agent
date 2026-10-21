@@ -92,7 +92,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .badge.connecting, .badge.connected { background: #d29200; }
 .badge.disconnected { background: var(--err); }
 .composer button.icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 28px; padding: 0; }
-.input-wrap { position: relative; display: flex; flex-direction: column; }
+.input-wrap { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .input-wrap textarea { padding-right: 46px; }
 .input-action { position: absolute; right: 18px; bottom: 6px; }
 .input-action button.icon { border: none; background: transparent; color: var(--accent); width: 28px; height: 28px; border-radius: 4px; }
@@ -114,4 +114,43 @@ button:disabled { opacity: 0.5; cursor: default; }
 .panel-head .back { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: none; border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
 .panel-head .back:hover { background: var(--assistant); }
 .reload-row { display: flex; }
-.settings .hint { margin: -4px 0 0 22px; }
+.settings .hint { margin: -4px 0 0 40px; }
+/* Toggle switch (settings rows, menu items) */
+.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; user-select: none; }
+.toggle.disabled { opacity: 0.5; cursor: default; }
+.toggle input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.toggle-track { position: relative; flex-shrink: 0; width: 32px; height: 18px; border-radius: 999px; background: var(--border); transition: background 0.15s; }
+.toggle-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
+.toggle input:checked + .toggle-track { background: var(--accent); }
+.toggle input:checked + .toggle-track .toggle-knob { transform: translateX(14px); }
+.toggle input:focus-visible + .toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings .toggle { flex-direction: row; }
+/* Composer "+" menu */
+.composer-row { display: flex; gap: 6px; align-items: flex-end; }
+.plus-wrap { position: relative; flex-shrink: 0; }
+.composer button.icon.plus { width: 30px; height: 30px; border-radius: 8px; margin-bottom: 4px; }
+.composer button.icon.plus[aria-expanded="true"] { background: var(--assistant); }
+.plus-menu { position: absolute; bottom: 100%; left: 0; margin-bottom: 6px; min-width: 240px; max-width: 320px; max-height: 60vh; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); padding: 4px; z-index: 10; }
+.menu-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: none; border-radius: 6px; background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.menu-row:hover { background: var(--assistant); }
+.menu-row .grow { flex: 1; min-width: 0; }
+.menu-check { color: var(--accent); display: inline-flex; }
+.menu-sub { opacity: 0.6; display: inline-flex; }
+.menu-back { border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; margin-bottom: 2px; }
+.menu-title { font-weight: 600; }
+.menu-empty { margin: 0; padding: 8px 10px; }
+.menu-item { cursor: default; }
+.menu-item:hover { background: transparent; }
+.menu-item-text { display: flex; flex-direction: column; gap: 2px; }
+.menu-item-name { display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-item-detail { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.source-badge { font-size: 10px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; line-height: 14px; flex-shrink: 0; }
+/* Attachments */
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 8px; padding: 3px 6px; font-size: 11px; max-width: 100%; background: var(--bg); }
+.chip img { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; }
+.chip .name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-remove { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+.chip-remove:hover { color: var(--fg); }
+.composer.drop-active { outline: 2px dashed var(--accent); outline-offset: -4px; }
+.msg.user .chips { margin-top: 6px; margin-bottom: 0; }

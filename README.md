@@ -111,6 +111,7 @@ Add `&lang=ja` or `&lang=en` to the URL to force the UI language; otherwise the 
 - `autoApproveReadOnly`: Auto-approve read-only tool calls (file viewing and the read-only OfficeCLI commands view/get/query/help/validate). Shell commands, file writes and URL access always ask for approval in the task pane.
 - `model`: Copilot model ID (defaults to the Copilot CLI default). Can also be chosen in the task pane settings (takes effect from the next session).
 - `copilotCliPath`: Path to the executable when `copilot` is not on PATH.
+- `disabledMcpServers` / `disabledSkills`: Copilot CLI MCP servers and skills switched off from the task pane's "+" menu (see below).
 
 ### Add-in: `%LOCALAPPDATA%\OfficeCliAgent\addin.json`
 
@@ -144,6 +145,14 @@ First run with your own key:
 - Use `apiKeyEnv` instead of `apiKey` to read the key from an environment variable. Local models need no key.
 - BYOK requires a model ID (the provider's default `model`, or one entered in the task pane).
 - With BYOK, usage and rate limits are those of the provider; no Copilot premium requests are consumed. Pick a model that supports tool calling (for Ollama, Llama 3.1 or later, Qwen 2.5, etc.).
+
+## Composer menu ("+")
+
+The "+" button next to the message box opens a menu modelled on the Claude desktop add-in:
+
+- **Add files or photos** — attach files through a file picker. You can also drag files from Explorer onto the message box, or paste an image from the clipboard. Up to 5 files per message, 10 MB each. Images (png/jpg/gif/webp/bmp) are shown to the model directly; Office files, PDFs and text files are saved under the session workspace (`attachments\`) and the agent reads them with officecli or its file tools. The agent can also place an attached image in the document with `office_insert_image`.
+- **Search the web** — on by default. Off removes Copilot's `web_search` / `web_fetch` tools from the session and tells the agent not to reach the internet through shell commands either. The change is applied immediately while the chat is still empty; otherwise it applies to the next new chat.
+- **MCP servers** / **Skills** — the MCP servers and skills configured for your GitHub Copilot CLI (`~/.copilot/mcp-config.json`, `~/.copilot/skills`, plus the runtime's built-in skills) are loaded into the agent and listed here with a switch each. Switching one off applies to the running chat right away and is remembered for later chats (stored as `disabledMcpServers` / `disabledSkills` in the host's `config.json`). The task pane never writes to `~/.copilot`: add or remove servers and skills with the Copilot CLI itself (`copilot mcp add …`, or a folder with `SKILL.md` under `~/.copilot/skills`); "Open Copilot CLI settings…" opens that location in Windows.
 
 ## Example requests
 

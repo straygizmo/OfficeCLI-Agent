@@ -7,10 +7,11 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { CopilotClient, RuntimeConnection, type ModelInfo } from "@github/copilot-sdk";
 import { WebSocketServer, type WebSocket } from "ws";
-import { PROTOCOL_VERSION, WS_PATH, isClientMessage, type ClientMessage, type ModelSummary } from "@officecli-agent/protocol";
+import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MAX_FILES, PROTOCOL_VERSION, WS_PATH, isClientMessage, type ClientMessage, type ModelSummary } from "@officecli-agent/protocol";
 import { AgentSession } from "./agent-session.js";
-import { deleteProvider, summarizeProviders, upsertProvider, type HostConfig } from "./config.js";
+import { deleteProvider, setMcpServerEnabled, setSkillEnabled, summarizeProviders, upsertProvider, type HostConfig } from "./config.js";
 import { TaskpaneLink } from "./taskpane-link.js";
+import { applyToggleToSessions } from "./toggles.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -63,8 +64,20 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
 
   const taskpaneDir = resolveTaskpaneDir();
   const httpServer = createHttpServer(config, (req, res) => serveStatic(req, res, taskpaneDir, config.serveTaskpane));
-  const wss = new WebSocketServer({ server: httpServer, path: WS_PATH });
+  // Attachments arrive as base64 inside chat.send frames; allow the full batch plus slack.
+  const wss = new WebSocketServer({ server: httpServer, path: WS_PATH, maxPayload: Math.ceil((ATTACHMENT_MAX_FILES * ATTACHMENT_MAX_BYTES * 4) / 3) + 1024 * 1024 });
   const sessions = new Set<AgentSession>();
+
+  /** After a toggle, every connected pane gets the fresh catalog (the choice is shared through config.json). */
+  const broadcastCatalog = async () => {
+    for (const s of sessions) {
+      try {
+        s.link.send({ type: "catalog", catalog: await s.refreshCatalog() });
+      } catch (err) {
+        console.warn(`[host] catalog refresh failed: ${(err as Error).message}`);
+      }
+    }
+  };
 
   // Idle shutdown: the VSTO add-in starts us with --idle-exit so we go away once
   // every Office window that used us has closed.
@@ -143,24 +156,31 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
               model: message.settings?.model ?? config.model,
               autoApproveReadOnly: message.settings?.autoApproveReadOnly ?? config.autoApproveReadOnly,
               workAcrossOpenFiles: message.settings?.workAcrossOpenFiles ?? false,
+              webSearch: message.settings?.webSearch ?? true,
             },
             workspaceDir: next.workspaceDir,
             allowedDirectories: config.allowedDirectories,
             officecliAvailable,
+            catalog: next.catalog,
           });
           return next;
         }
         case "chat.send":
           if (!current) throw new Error("Session not ready; send 'hello' first.");
-          await current.send(message.text);
+          await current.send(message.text, message.attachments);
           return current;
         case "chat.abort":
           await current?.abort();
           return current;
         case "settings.update":
           current?.updateSettings(message.settings);
-          if (message.settings.model !== undefined || message.settings.provider !== undefined || message.settings.workAcrossOpenFiles !== undefined) {
-            link.status("Provider, model and open-file access changes apply to the next new chat.");
+          if (
+            message.settings.model !== undefined ||
+            message.settings.provider !== undefined ||
+            message.settings.workAcrossOpenFiles !== undefined ||
+            message.settings.webSearch !== undefined
+          ) {
+            link.status("Provider, model, open-file access and web search changes apply to the next new chat.");
           }
           return current;
         case "provider.save":
@@ -172,6 +192,16 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
           deleteProvider(config, message.name);
           link.send({ type: "providers", providers: summarizeProviders(config) });
           link.status(`Provider '${message.name}' removed.`);
+          return current;
+        case "mcp.setEnabled":
+          setMcpServerEnabled(config, message.name, message.enabled);
+          await applyToggleToSessions(sessions, "mcp", message.name, message.enabled);
+          await broadcastCatalog();
+          return current;
+        case "skills.setEnabled":
+          setSkillEnabled(config, message.name, message.enabled);
+          await applyToggleToSessions(sessions, "skill", message.name, message.enabled);
+          await broadcastCatalog();
           return current;
         case "session.reset":
           if (current) {

@@ -9,7 +9,9 @@ import type {
   ProviderConfig,
   SessionEvent,
 } from "@github/copilot-sdk";
-import { COPILOT_PROVIDER, type AgentEvent, type HostApp, type SessionSettings, type UiLocale } from "@officecli-agent/protocol";
+import { COPILOT_PROVIDER, WEB_TOOL_NAMES, type AgentEvent, type AttachmentInput, type Catalog, type HostApp, type SessionSettings, type UiLocale } from "@officecli-agent/protocol";
+import { saveAttachments, toMessageOptions } from "./attachments.js";
+import { buildCatalog } from "./catalog.js";
 import { resolveApiKey, type HostConfig } from "./config.js";
 import { createOfficeTools } from "./office-tools.js";
 import { createOfficecliTool } from "./officecli-tool.js";
@@ -34,6 +36,7 @@ export class AgentSession {
   private session: CopilotSession | undefined;
   private unsubscribe: (() => void) | undefined;
   private settings: SessionSettings;
+  private catalogValue: Catalog = { mcpServers: [], skills: [], mcpConfigPath: "", skillsDir: "" };
 
   constructor(private readonly opts: AgentSessionOptions) {
     this.settings = { ...opts.settings };
@@ -79,23 +82,72 @@ export class AgentSession {
       workingDirectory: this.workspaceDir,
       additionalDirectories: config.allowedDirectories,
       tools,
+      // Load the MCP servers and skills the user's Copilot CLI has (~/.copilot); the pane shows and toggles them.
+      enableConfigDiscovery: true,
+      enableSkills: true,
+      disabledMcpServers: config.disabledMcpServers,
+      disabledSkills: config.disabledSkills,
+      excludedTools: this.settings.webSearch === false ? [...WEB_TOOL_NAMES] : undefined,
       systemMessage: {
         mode: "append",
-        content: buildSystemPrompt(hostApp, this.workspaceDir, officecliAvailable, workAcrossOpenFiles),
+        content: buildSystemPrompt(hostApp, this.workspaceDir, officecliAvailable, workAcrossOpenFiles, this.settings.webSearch !== false),
       },
       onPermissionRequest: this.permissionHandler,
     });
 
     this.unsubscribe = this.session.on((event) => this.forward(event));
+    await this.refreshCatalog();
   }
 
   get sessionId(): string {
     return this.session?.sessionId ?? this.id;
   }
 
-  async send(text: string): Promise<void> {
+  get link(): TaskpaneLink {
+    return this.opts.link;
+  }
+
+  /** MCP servers and skills loaded from the Copilot CLI configuration, with the pane's on/off state. */
+  get catalog(): Catalog {
+    return this.catalogValue;
+  }
+
+  async refreshCatalog(): Promise<Catalog> {
+    const { client, config } = this.opts;
+    const session = this.session;
+    this.catalogValue = await buildCatalog(
+      () => client.rpc.mcp.discover({}),
+      () => (session ? session.rpc.skills.list() : Promise.resolve({ skills: [] })),
+      config,
+    );
+    return this.catalogValue;
+  }
+
+  /** Flip an MCP server for the running session; the persisted choice (config.json) is the caller's job. */
+  async setMcpEnabled(name: string, enabled: boolean): Promise<void> {
+    if (!this.session) return;
+    try {
+      if (enabled) await this.session.rpc.mcp.enable({ serverName: name });
+      else await this.session.rpc.mcp.disable({ serverName: name });
+    } catch (err) {
+      console.warn(`[session ${this.id}] mcp.${enabled ? "enable" : "disable"}('${name}') failed: ${(err as Error).message}`);
+    }
+  }
+
+  async setSkillEnabled(name: string, enabled: boolean): Promise<void> {
+    if (!this.session) return;
+    try {
+      if (enabled) await this.session.rpc.skills.enable({ name });
+      else await this.session.rpc.skills.disable({ name });
+    } catch (err) {
+      console.warn(`[session ${this.id}] skills.${enabled ? "enable" : "disable"}('${name}') failed: ${(err as Error).message}`);
+    }
+  }
+
+  async send(text: string, attachments: AttachmentInput[] = []): Promise<void> {
     if (!this.session) throw new Error("Session not started");
-    await this.session.send({ prompt: text });
+    const saved = attachments.length ? await saveAttachments(this.workspaceDir, attachments) : [];
+    await this.session.send(toMessageOptions(text, saved));
   }
 
   async abort(): Promise<void> {
@@ -181,6 +233,14 @@ export class AgentSession {
           success: event.data.success,
           output: event.data.result?.content?.slice(0, 4000),
           error: event.data.error?.message,
+        });
+        break;
+      case "assistant.server_tool_progress":
+        this.emit({
+          kind: "server-tool",
+          name: event.data.kind,
+          outputIndex: event.data.outputIndex,
+          status: event.data.status as "in_progress" | "searching" | "completed",
         });
         break;
       case "session.idle":
