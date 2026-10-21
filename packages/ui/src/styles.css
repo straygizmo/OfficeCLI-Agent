@@ -145,3 +145,12 @@ button:disabled { opacity: 0.5; cursor: default; }
 .menu-item-name { display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-item-detail { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .source-badge { font-size: 10px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; line-height: 14px; flex-shrink: 0; }
+/* Attachments */
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 8px; padding: 3px 6px; font-size: 11px; max-width: 100%; background: var(--bg); }
+.chip img { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; }
+.chip .name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-remove { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+.chip-remove:hover { color: var(--fg); }
+.composer.drop-active { outline: 2px dashed var(--accent); outline-offset: -4px; }
+.msg.user .chips { margin-top: 6px; margin-bottom: 0; }

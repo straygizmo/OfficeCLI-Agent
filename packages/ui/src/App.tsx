@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   COPILOT_PROVIDER,
   type AgentEvent,
+  type AttachmentInput,
   type ByokProviderInput,
   type Catalog,
   type HostApp,
@@ -11,14 +12,16 @@ import {
   type ServerMessage,
   type SessionSettings,
 } from "@officecli-agent/protocol";
+import { AttachmentChips } from "./AttachmentChips";
 import { PlusMenu } from "./PlusMenu";
+import { acceptFiles, makeThumbnail, mimeTypeOf, readAsBase64, type PendingAttachment, type ShownAttachment } from "./attachments";
 import { ProviderEditor } from "./ProviderEditor";
 import { Toggle } from "./Toggle";
 import { HostClient, defaultHostUrl, isEmbeddedInWebView2, type ConnectionState } from "./host-client";
 import { t } from "./i18n";
 
 type ChatItem =
-  | { id: string; role: "user"; text: string }
+  | { id: string; role: "user"; text: string; attachments?: ShownAttachment[] }
   | { id: string; role: "assistant"; text: string; streaming: boolean }
   | { id: string; role: "tool"; toolName: string; args?: unknown; status: "running" | "ok" | "error"; output?: string; mcpServer?: string }
   | { id: string; role: "system"; text: string };
@@ -99,6 +102,8 @@ export function App({ hostApp: initialHostApp }: Props) {
   const [info, setInfo] = useState<{ workspaceDir: string; officecliAvailable: boolean; allowedDirectories: string[] } | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [dragOver, setDragOver] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
@@ -152,6 +157,17 @@ export function App({ hostApp: initialHostApp }: Props) {
         break;
       case "idle":
         setBusy(false);
+        break;
+      case "server-tool":
+        setItems((prev) => {
+          const id = `server-tool-${event.outputIndex}`;
+          const status = event.status === "completed" ? "ok" : "running";
+          const idx = prev.findIndex((i) => i.id === id);
+          if (idx === -1) return [...prev, { id, role: "tool", toolName: t.searchingWeb, status }];
+          const copy = [...prev];
+          copy[idx] = { ...(copy[idx] as Extract<ChatItem, { role: "tool" }>), status };
+          return copy;
+        });
         break;
       case "error":
         setBusy(false);
@@ -234,13 +250,37 @@ export function App({ hostApp: initialHostApp }: Props) {
     });
   }, [items, busy, conversationId]);
 
-  const send = () => {
+  const addFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    const { next, error } = acceptFiles(pending, files);
+    setPending(next);
+    if (error) setStatus(error);
+  };
+
+  const removePending = (id: string) => {
+    setPending((prev) => {
+      const gone = prev.find((p) => p.id === id);
+      if (gone?.previewUrl) URL.revokeObjectURL(gone.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const send = async () => {
     const text = input.trim();
-    if (!text || state !== "ready") return;
-    append({ id: nextId(), role: "user", text });
-    clientRef.current?.send({ type: "chat.send", text });
+    if ((!text && pending.length === 0) || state !== "ready") return;
+    const files = pending;
+    setPending([]);
     setInput("");
     setBusy(true);
+    const attachments: AttachmentInput[] = [];
+    const shown: ShownAttachment[] = [];
+    for (const p of files) {
+      attachments.push({ name: p.file.name, mimeType: mimeTypeOf(p.file), size: p.file.size, dataBase64: await readAsBase64(p.file) });
+      shown.push({ name: p.file.name, mimeType: mimeTypeOf(p.file), size: p.file.size, thumbnail: await makeThumbnail(p.file) });
+      if (p.previewUrl) URL.revokeObjectURL(p.previewUrl);
+    }
+    append({ id: nextId(), role: "user", text, attachments: shown.length ? shown : undefined });
+    clientRef.current?.send({ type: "chat.send", text, attachments: attachments.length ? attachments : undefined });
   };
 
   const abort = () => clientRef.current?.send({ type: "chat.abort" });
@@ -588,8 +628,34 @@ export function App({ hostApp: initialHostApp }: Props) {
         ))}
       </main>
 
-      <footer className="composer">
-        <input ref={fileInputRef} type="file" multiple hidden aria-hidden="true" tabIndex={-1} />
+      <footer
+        className={`composer${dragOver ? " drop-active" : ""}`}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          if (state === "ready") setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (state === "ready") addFiles(Array.from(e.dataTransfer.files));
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={(e) => {
+            addFiles(Array.from(e.target.files ?? []));
+            e.target.value = "";
+          }}
+        />
         <div className="composer-row">
         <PlusMenu
           disabled={state !== "ready"}
@@ -602,15 +668,26 @@ export function App({ hostApp: initialHostApp }: Props) {
           onOpenPath={openPath}
         />
         <div className="input-wrap">
+          <AttachmentChips items={pending.map((p) => ({ id: p.id, name: p.file.name, size: p.file.size, previewUrl: p.previewUrl }))} onRemove={removePending} />
           <textarea
             value={input}
             placeholder={state === "ready" ? t.inputPlaceholder : t.inputDisabled}
             disabled={state !== "ready"}
             onChange={(e) => setInput(e.target.value)}
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData.items)
+                .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+                .map((it) => it.getAsFile())
+                .filter((f): f is File => f !== null);
+              if (files.length) {
+                e.preventDefault();
+                addFiles(files);
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                send();
+                void send();
               }
             }}
             rows={4}
@@ -623,7 +700,7 @@ export function App({ hostApp: initialHostApp }: Props) {
                 </svg>
               </button>
             ) : (
-              <button className="icon" onClick={send} disabled={state !== "ready" || !input.trim()} title={t.send} aria-label={t.send}>
+              <button className="icon" onClick={() => void send()} disabled={state !== "ready" || (!input.trim() && pending.length === 0)} title={t.send} aria-label={t.send}>
                 <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true">
                   <path d="M1.7 2.2a.6.6 0 0 1 .8-.7l11.8 5.9a.7.7 0 0 1 0 1.2L2.5 14.5a.6.6 0 0 1-.8-.7L3 8.6h5.2a.6.6 0 0 0 0-1.2H3L1.7 2.2z" />
                 </svg>
@@ -643,7 +720,12 @@ function ChatRow({ item }: { item: ChatItem }) {
   const [open, setOpen] = useState(false);
   switch (item.role) {
     case "user":
-      return <div className="msg user">{item.text}</div>;
+      return (
+        <div className="msg user">
+          {item.text}
+          {item.attachments && <AttachmentChips items={item.attachments} />}
+        </div>
+      );
     case "assistant":
       return <div className={`msg assistant${item.streaming ? " streaming" : ""}`}>{item.text}</div>;
     case "system":
