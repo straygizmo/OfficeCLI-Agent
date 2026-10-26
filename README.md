@@ -135,7 +135,7 @@ First run with your own key:
   "providers": [
     { "name": "openai", "type": "openai", "baseUrl": "https://api.openai.com/v1", "apiKeyEnv": "OPENAI_API_KEY", "model": "gpt-6-luna" },
     { "name": "anthropic", "type": "anthropic", "baseUrl": "https://api.anthropic.com", "apiKey": "sk-ant-…", "model": "claude-sonnet-5.5" },
-    { "name": "azure", "type": "azure", "baseUrl": "https://<resource>.openai.azure.com", "apiKey": "…", "model": "gpt-6-luna", "azureApiVersion": "2024-10-21" },
+    { "name": "azure", "type": "azure", "baseUrl": "", "resourceNameEnv": "AZURE_RESOURCE_NAME", "apiKeyEnv": "AZURE_OPENAI_API_KEY", "model": "gpt-6-luna", "azureApiVersion": "2024-10-21" },
     { "name": "ollama", "type": "openai", "baseUrl": "http://localhost:11434/v1", "model": "llama3.1", "modelProvider": "ollama" }
   ]
 }
@@ -143,7 +143,9 @@ First run with your own key:
 
 - `type`: `openai` (any OpenAI-compatible server: OpenAI / Ollama / vLLM / LiteLLM / LM Studio / Foundry Local), `azure` (native Azure OpenAI), or `anthropic`.
 - `wireApi`: Defaults to `responses` for OpenAI (`api.openai.com`) and Azure OpenAI (gpt-5.6 or later assumed), and `completions` for other OpenAI-compatible servers. Set it explicitly if needed. For Azure, `model` is the deployment name.
-- Use `apiKeyEnv` instead of `apiKey` to read the key from an environment variable. Local models need no key.
+- `apiKeyEnv` names an environment variable to read the key from ("API key environment variable" in the task pane). A key entered directly (`apiKey`) takes precedence. Local models need no key.
+- For Azure, `resourceNameEnv` names an environment variable holding the resource name; when `baseUrl` is blank, `https://<resource>.openai.azure.com` is used. An entered `baseUrl` takes precedence. The Azure preset fills in `AZURE_OPENAI_API_KEY` / `AZURE_RESOURCE_NAME`.
+- Environment variables are read from the host's environment, inherited when Office starts. Restart Office after setting or changing them.
 - BYOK requires a model ID (the provider's default `model`, or one entered in the task pane).
 - With BYOK, usage and rate limits are those of the provider; no Copilot premium requests are consumed. Pick a model that supports tool calling (for Ollama, Llama 3.1 or later, Qwen 2.5, etc.).
 

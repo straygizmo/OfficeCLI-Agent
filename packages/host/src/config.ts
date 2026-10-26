@@ -4,10 +4,7 @@ import path from "node:path";
 import { COPILOT_PROVIDER, DEFAULT_PORT, type ByokProviderInput, type ProviderSummary } from "@officecli-agent/protocol";
 
 /** A BYOK provider as stored in config.json (includes the secret). */
-export interface StoredProvider extends Omit<ByokProviderInput, "apiKey"> {
-  apiKey?: string;
-  /** Read the key from this environment variable instead of storing it. */
-  apiKeyEnv?: string;
+export interface StoredProvider extends ByokProviderInput {
   /** Extra HTTP headers for the provider. */
   headers?: Record<string, string>;
 }
@@ -115,46 +112,73 @@ export function saveConfig(config: HostConfig): void {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
 }
 
+function fromEnv(name: string | undefined): string | undefined {
+  return (name && process.env[name]?.trim()) || undefined;
+}
+
+/** A key entered in the pane wins; otherwise the `apiKeyEnv` variable. */
 export function resolveApiKey(provider: StoredProvider): string | undefined {
-  if (provider.apiKeyEnv) {
-    const fromEnv = process.env[provider.apiKeyEnv];
-    if (fromEnv) return fromEnv;
-  }
-  return provider.apiKey || undefined;
+  return provider.apiKey || fromEnv(provider.apiKeyEnv);
+}
+
+/** True when the base URL is unset or still the Azure preset's `<resource>` placeholder. */
+function baseUrlMissing(baseUrl: string | undefined): boolean {
+  return !baseUrl?.trim() || baseUrl.includes("<resource>");
+}
+
+/**
+ * A base URL entered in the pane wins; for Azure without one, it is built from the
+ * resource name in `resourceNameEnv` (https://<resource>.openai.azure.com).
+ */
+export function resolveBaseUrl(provider: StoredProvider): string | undefined {
+  if (!baseUrlMissing(provider.baseUrl)) return provider.baseUrl.trim();
+  if (provider.type !== "azure") return undefined;
+  const resource = fromEnv(provider.resourceNameEnv);
+  return resource ? `https://${resource}.openai.azure.com` : undefined;
 }
 
 export function summarizeProviders(config: HostConfig): ProviderSummary[] {
   return [
     { name: COPILOT_PROVIDER, type: "copilot", model: config.model, hasApiKey: true },
-    ...config.providers.map((p) => ({
+    ...config.providers.map((p): ProviderSummary => ({
       name: p.name,
       type: p.type,
       baseUrl: p.baseUrl,
       model: p.model,
+      azureApiVersion: p.azureApiVersion,
+      apiKeyEnv: p.apiKeyEnv,
+      resourceNameEnv: p.resourceNameEnv,
       hasApiKey: Boolean(resolveApiKey(p)),
+      apiKeySource: p.apiKey ? "stored" : fromEnv(p.apiKeyEnv) ? "env" : undefined,
     })),
   ];
 }
 
-/** Add or update a BYOK provider from task-pane input. An omitted apiKey keeps the stored one. */
+/** Add or update a BYOK provider from task-pane input. An omitted apiKey / *Env keeps the stored one. */
 export function upsertProvider(config: HostConfig, input: ByokProviderInput): void {
   const name = input.name.trim();
   if (!name) throw new Error("Provider name is required.");
   if (name.toLowerCase() === COPILOT_PROVIDER) throw new Error(`'${COPILOT_PROVIDER}' is reserved.`);
-  if (!/^https?:\/\//i.test(input.baseUrl.trim())) throw new Error("baseUrl must start with http:// or https://");
-
   const existing = config.providers.find((p) => p.name === name);
+  const baseUrl = input.baseUrl.trim();
+  const resourceNameEnv = input.type === "azure" ? (input.resourceNameEnv ?? existing?.resourceNameEnv)?.trim() : "";
+  if (baseUrl ? !/^https?:\/\//i.test(baseUrl) : !resourceNameEnv) {
+    throw new Error("baseUrl must start with http:// or https:// (Azure: or set the resource name environment variable)");
+  }
+
   const next: StoredProvider = {
     ...(existing ?? {}),
     name,
     type: input.type,
-    baseUrl: input.baseUrl.trim(),
+    baseUrl,
     model: input.model?.trim() || undefined,
     wireApi: input.wireApi,
     azureApiVersion: input.azureApiVersion?.trim() || undefined,
     modelProvider: input.modelProvider,
   };
   if (input.apiKey !== undefined) next.apiKey = input.apiKey.trim() || undefined;
+  if (input.apiKeyEnv !== undefined) next.apiKeyEnv = input.apiKeyEnv.trim() || undefined;
+  next.resourceNameEnv = resourceNameEnv || undefined;
 
   if (existing) Object.assign(existing, next);
   else config.providers.push(next);

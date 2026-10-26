@@ -12,7 +12,7 @@ import type {
 import { COPILOT_PROVIDER, WEB_TOOL_NAMES, type AgentEvent, type AttachmentInput, type Catalog, type HostApp, type SessionSettings, type UiLocale } from "@officecli-agent/protocol";
 import { saveAttachments, toMessageOptions } from "./attachments.js";
 import { buildCatalog } from "./catalog.js";
-import { resolveApiKey, type HostConfig } from "./config.js";
+import { resolveApiKey, resolveBaseUrl, type HostConfig } from "./config.js";
 import { createOfficeTools } from "./office-tools.js";
 import { createOfficecliTool } from "./officecli-tool.js";
 import { buildSystemPrompt } from "./system-prompt.js";
@@ -186,11 +186,19 @@ export class AgentSession {
     if (!stored) throw new Error(`Unknown provider '${name}'. Configure it in the task pane settings.`);
     const model = this.settings.model || stored.model;
     if (!model) throw new Error(`Provider '${name}' needs a model id (BYOK requires an explicit model).`);
+    const baseUrl = resolveBaseUrl(stored);
+    if (!baseUrl) {
+      throw new Error(
+        stored.resourceNameEnv
+          ? `Provider '${name}' has no base URL and the environment variable ${stored.resourceNameEnv} is not set (restart Office after setting it).`
+          : `Provider '${name}' has no base URL.`,
+      );
+    }
     const provider: ProviderConfig = {
       type: stored.type,
-      baseUrl: stored.baseUrl,
+      baseUrl,
       apiKey: resolveApiKey(stored),
-      wireApi: stored.type === "anthropic" ? undefined : (stored.wireApi ?? defaultWireApi(stored.type, stored.baseUrl)),
+      wireApi: stored.type === "anthropic" ? undefined : (stored.wireApi ?? defaultWireApi(stored.type, baseUrl)),
       modelProvider: stored.modelProvider,
       azure: stored.type === "azure" && stored.azureApiVersion ? { apiVersion: stored.azureApiVersion } : undefined,
       headers: stored.headers,
