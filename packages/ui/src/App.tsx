@@ -422,11 +422,16 @@ export function App({ hostApp: initialHostApp }: Props) {
   const selectedProvider = providers.find((p) => p.name === (settings.session.provider ?? COPILOT_PROVIDER));
   const isCopilot = !selectedProvider || selectedProvider.type === "copilot";
 
+  // The running session keeps its provider after it is deleted from the list: remember the last summary seen for it.
+  const activeProviderRef = useRef<ProviderSummary | undefined>(undefined);
   const activeLabel = useMemo(() => {
-    const provider = providers.find((p) => p.name === (activeSession.provider ?? COPILOT_PROVIDER));
-    const copilot = !provider || provider.type === "copilot";
-    const providerName = copilot ? "Copilot" : provider.name;
-    const modelId = activeSession.model ?? (copilot ? undefined : provider.model);
+    const name = activeSession.provider ?? COPILOT_PROVIDER;
+    const listed = providers.find((p) => p.name === name);
+    if (listed) activeProviderRef.current = listed;
+    const provider = listed ?? (activeProviderRef.current?.name === name ? activeProviderRef.current : undefined);
+    const copilot = name === COPILOT_PROVIDER || provider?.type === "copilot";
+    const providerName = copilot ? "Copilot" : name;
+    const modelId = activeSession.model ?? (copilot ? undefined : provider?.model);
     const modelName = copilot ? models.find((m) => m.id === modelId)?.name ?? modelId : modelId;
     return `${providerName} / ${modelName ?? t.defaultModelShort}`;
   }, [providers, models, activeSession]);
