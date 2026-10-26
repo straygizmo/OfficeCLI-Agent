@@ -28,7 +28,16 @@
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
-.app { display: flex; flex-direction: column; height: 100%; }
+.app { display: flex; flex-direction: column; height: 100%; background: var(--pane, var(--bg)); border-radius: 4px; overflow: hidden; }
+/* Pale per-application tint for the pane background */
+.app[data-host-app="Word"] { --pane: #f6f9fd; }
+.app[data-host-app="Excel"] { --pane: #f5faf6; }
+.app[data-host-app="PowerPoint"] { --pane: #fef8f5; }
+@media (prefers-color-scheme: dark) {
+  .app[data-host-app="Word"] { --pane: #1e2228; }
+  .app[data-host-app="Excel"] { --pane: #1e231f; }
+  .app[data-host-app="PowerPoint"] { --pane: #26211f; }
+}
 .topbar { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 .muted { color: var(--muted); }
 .small { font-size: 11px; }

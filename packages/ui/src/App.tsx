@@ -445,7 +445,7 @@ export function App({ hostApp: initialHostApp }: Props) {
   }, [state]);
 
   return (
-    <div className="app">
+    <div className="app" data-host-app={hostApp}>
       <header className="topbar">
         <span className="active-model muted small" title={activeLabel}>
           {activeLabel}
