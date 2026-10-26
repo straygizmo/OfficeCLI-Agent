@@ -165,6 +165,8 @@ export interface SessionSettings {
   model?: string;
   /** Auto-approve read-only tool calls without asking the user. Default true. */
   autoApproveReadOnly?: boolean;
+  /** Run every officecli command (including writes) without asking the user. Default false. */
+  autoApproveOfficecli?: boolean;
   /**
    * Let the agent list the other documents open in the same application and export copies of them
    * (read-only access; only the active document is edited live). Default false. Applies to new sessions.

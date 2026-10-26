@@ -53,6 +53,8 @@ const ja = {
   edit: "編集",
   delete: "削除",
   autoApproveReadOnly: "読み取り専用のツール呼び出しを自動承認",
+  autoApproveOfficecli: "OfficeCLI の実行を自動承認",
+  autoApproveOfficecliHint: "書き込みを含むすべての officecli コマンドを確認なしで実行します。",
   workAcrossOpenFiles: "開いている他のファイルも参照する",
   workAcrossOpenFilesHint: {
     Word: "同じ Word で開いている他の文書を一覧し、コピーを読み取れるようにします。編集できるのはこの文書だけです。",
@@ -174,6 +176,8 @@ const en: typeof ja = {
   edit: "Edit",
   delete: "Delete",
   autoApproveReadOnly: "Auto-approve read-only tool calls",
+  autoApproveOfficecli: "Auto-approve OfficeCLI commands",
+  autoApproveOfficecliHint: "Runs every officecli command, writes included, without asking.",
   workAcrossOpenFiles: "Let the agent see other open files",
   workAcrossOpenFilesHint: {
     Word: "Lists the other documents open in this Word and lets the agent read copies of them. Only this document is edited.",

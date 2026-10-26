@@ -578,6 +578,12 @@ export function App({ hostApp: initialHostApp }: Props) {
             label={t.autoApproveReadOnly}
           />
           <Toggle
+            checked={settings.session.autoApproveOfficecli ?? false}
+            onChange={(next) => updateSession({ autoApproveOfficecli: next })}
+            label={t.autoApproveOfficecli}
+          />
+          <p className="muted small hint">{t.autoApproveOfficecliHint}</p>
+          <Toggle
             checked={settings.session.workAcrossOpenFiles ?? false}
             onChange={(next) => updateSession({ workAcrossOpenFiles: next })}
             label={t.workAcrossOpenFiles}

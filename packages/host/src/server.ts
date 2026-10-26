@@ -155,6 +155,7 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
               provider: message.settings?.provider ?? config.defaultProvider,
               model: message.settings?.model ?? config.model,
               autoApproveReadOnly: message.settings?.autoApproveReadOnly ?? config.autoApproveReadOnly,
+              autoApproveOfficecli: message.settings?.autoApproveOfficecli ?? false,
               workAcrossOpenFiles: message.settings?.workAcrossOpenFiles ?? false,
               webSearch: message.settings?.webSearch ?? true,
             },
