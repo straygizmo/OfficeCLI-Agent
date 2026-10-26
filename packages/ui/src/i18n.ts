@@ -68,7 +68,7 @@ const ja = {
   unknown: "(不明)",
   allowedDirs: "許可フォルダ",
   allowedDirsNone: "(なし — 都度確認)",
-  settingsNote: "プロバイダー / モデル / 他のファイルの参照の変更は「新しいチャット」後の新しいセッションから有効になります。API キーはこの PC の ",
+  settingsNote: "プロバイダー / モデル / 他のファイルの参照の変更は、設定を閉じたときにチャットが空ならすぐ、会話中なら「新しいチャット」後に有効になります。API キーはこの PC の ",
   settingsNoteSuffix: " に保存されます。",
   back: "戻る",
   emptyIntro: {
@@ -103,6 +103,7 @@ const ja = {
   cliDisabledTip: "Copilot CLI 側で無効になっています",
   plusMenu: "メニュー",
   webSearchNextChat: "Web 検索の変更は次の新しいチャットから有効になります",
+  sessionChangeNextChat: "プロバイダ・モデルなどの変更は次の新しいチャットから有効になります",
   openPathHint: (p: string) => `ここを開いてください: ${p}`,
   copilotMcpConfig: "Copilot CLI MCP 設定",
   copilotSkillsDir: "Copilot CLI スキル",
@@ -191,7 +192,7 @@ const en: typeof ja = {
   unknown: "(unknown)",
   allowedDirs: "Allowed folders",
   allowedDirsNone: "(none — ask each time)",
-  settingsNote: "Provider, model and open-file access changes take effect in the new session after \"New chat\". API keys are stored on this PC in ",
+  settingsNote: "Provider, model and open-file access changes take effect when you close settings if the chat is empty, otherwise after \"New chat\". API keys are stored on this PC in ",
   settingsNoteSuffix: ".",
   back: "Back",
   emptyIntro: {
@@ -226,6 +227,7 @@ const en: typeof ja = {
   cliDisabledTip: "Disabled in Copilot CLI itself",
   plusMenu: "Menu",
   webSearchNextChat: "The web search change applies to the next new chat",
+  sessionChangeNextChat: "Provider, model and other session changes apply to the next new chat",
   openPathHint: (p: string) => `Open this location: ${p}`,
   copilotMcpConfig: "Copilot CLI MCP config",
   copilotSkillsDir: "Copilot CLI skills",
