@@ -93,7 +93,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 .badge.disconnected { background: var(--err); }
 .composer button.icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 28px; padding: 0; }
 .input-wrap { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.input-wrap textarea { padding-right: 46px; }
+.input-wrap textarea { padding-bottom: 40px; }
+.input-tools { position: absolute; left: 6px; bottom: 6px; }
 .input-action { position: absolute; right: 18px; bottom: 6px; }
 .input-action button.icon { border: none; background: transparent; color: var(--accent); width: 28px; height: 28px; border-radius: 4px; }
 .input-action button.icon:hover:not(:disabled) { background: var(--assistant); }
@@ -126,9 +127,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .toggle input:focus-visible + .toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
 .settings .toggle { flex-direction: row; }
 /* Composer "+" menu */
-.composer-row { display: flex; gap: 6px; align-items: flex-end; }
 .plus-wrap { position: relative; flex-shrink: 0; }
-.composer button.icon.plus { width: 30px; height: 30px; border-radius: 8px; margin-bottom: 4px; }
+.composer button.icon.plus { width: 28px; height: 28px; border: none; border-radius: 6px; }
+.composer button.icon.plus:hover:not(:disabled) { background: var(--assistant); }
 .composer button.icon.plus[aria-expanded="true"] { background: var(--assistant); }
 .plus-menu { position: absolute; bottom: 100%; left: 0; margin-bottom: 6px; min-width: 240px; max-width: 320px; max-height: 60vh; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); padding: 4px; z-index: 10; }
 .menu-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: none; border-radius: 6px; background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }

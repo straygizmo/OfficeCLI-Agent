@@ -690,17 +690,6 @@ export function App({ hostApp: initialHostApp }: Props) {
             e.target.value = "";
           }}
         />
-        <div className="composer-row">
-        <PlusMenu
-          disabled={state !== "ready"}
-          webSearch={settings.session.webSearch ?? true}
-          onWebSearch={setWebSearch}
-          catalog={catalog}
-          onMcpToggle={setMcpEnabled}
-          onSkillToggle={setSkillEnabled}
-          onAddFiles={() => fileInputRef.current?.click()}
-          onOpenPath={openPath}
-        />
         <div className="input-wrap">
           <AttachmentChips items={pending.map((p) => ({ id: p.id, name: p.file.name, size: p.file.size, previewUrl: p.previewUrl }))} onRemove={removePending} />
           <textarea
@@ -726,6 +715,18 @@ export function App({ hostApp: initialHostApp }: Props) {
             }}
             rows={4}
           />
+          <div className="input-tools">
+            <PlusMenu
+              disabled={state !== "ready"}
+              webSearch={settings.session.webSearch ?? true}
+              onWebSearch={setWebSearch}
+              catalog={catalog}
+              onMcpToggle={setMcpEnabled}
+              onSkillToggle={setSkillEnabled}
+              onAddFiles={() => fileInputRef.current?.click()}
+              onOpenPath={openPath}
+            />
+          </div>
           <div className="input-action">
             {busy ? (
               <button className="icon stop" onClick={abort} title={t.stop} aria-label={t.stop}>
@@ -741,7 +742,6 @@ export function App({ hostApp: initialHostApp }: Props) {
               </button>
             )}
           </div>
-        </div>
         </div>
       </footer>
       </>
