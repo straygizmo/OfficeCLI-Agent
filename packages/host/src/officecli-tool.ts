@@ -10,6 +10,8 @@ export interface OfficecliToolContext {
   workspaceDir: string;
   link: TaskpaneLink;
   autoApproveReadOnly: () => boolean;
+  /** Skip the prompt for every command, writes included. */
+  autoApproveAll: () => boolean;
   permissionTimeoutMs: number;
 }
 
@@ -50,7 +52,8 @@ export function createOfficecliTool(ctx: OfficecliToolContext): Tool<unknown> {
       argv = forceHtmlRenderer(argv);
 
       const verb = argv[0].toLowerCase();
-      if (!READ_ONLY_VERBS.has(verb) || !ctx.autoApproveReadOnly()) {
+      const autoApproved = ctx.autoApproveAll() || (READ_ONLY_VERBS.has(verb) && ctx.autoApproveReadOnly());
+      if (!autoApproved) {
         const approved = await ctx.link.askPermission(
           { kind: "officecli", title: ctx.locale === "ja" ? "officecli を実行します" : "Run officecli", detail: "officecli " + argv.map(quoteForDisplay).join(" ") },
           ctx.permissionTimeoutMs,

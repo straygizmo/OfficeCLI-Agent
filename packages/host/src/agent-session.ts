@@ -70,6 +70,7 @@ export class AgentSession {
           workspaceDir: this.workspaceDir,
           link,
           autoApproveReadOnly: () => this.settings.autoApproveReadOnly ?? config.autoApproveReadOnly,
+          autoApproveAll: () => this.settings.autoApproveOfficecli ?? false,
           permissionTimeoutMs: config.permissionTimeoutSeconds * 1000,
         }),
       );

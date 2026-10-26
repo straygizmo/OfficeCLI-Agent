@@ -108,6 +108,7 @@ URL に `&lang=ja` / `&lang=en` を付けると表示言語を固定できます
 
 - `allowedDirectories`: エージェントが確認なしに読み書きできるフォルダ。ここ以外のファイルを `office_import_file` で読む場合はタスクペインに承認プロンプトが出ます。
 - `autoApproveReadOnly`: 読み取り専用のツール呼び出し（ファイル閲覧、OfficeCLI の読み取り系コマンド view/get/query/help/validate）を自動承認。シェル実行・ファイル書き換え・URL アクセスは常にタスクペインで承認を求めます。
+- 「OfficeCLI の実行を自動承認」（タスクペインの設定、既定はオフ）: 書き込みを含むすべての `officecli` コマンドを確認なしで実行します。現在のチャットにも即時反映されます。
 - `model`: Copilot のモデル ID（省略時は Copilot CLI の既定）。タスクペインの設定からも選べます（新しいセッションから有効）。
 - `copilotCliPath`: `copilot` が PATH にない場合の実行ファイルパス。
 - `disabledMcpServers` / `disabledSkills`: タスクペインの「+」メニューで OFF にした Copilot CLI の MCP サーバーとスキル（後述）。

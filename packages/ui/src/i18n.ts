@@ -53,6 +53,8 @@ const ja = {
   edit: "編集",
   delete: "削除",
   autoApproveReadOnly: "読み取り専用のツール呼び出しを自動承認",
+  autoApproveOfficecli: "OfficeCLI の実行を自動承認",
+  autoApproveOfficecliHint: "書き込みを含むすべての officecli コマンドを確認なしで実行します。",
   workAcrossOpenFiles: "開いている他のファイルも参照する",
   workAcrossOpenFilesHint: {
     Word: "同じ Word で開いている他の文書を一覧し、コピーを読み取れるようにします。編集できるのはこの文書だけです。",
@@ -66,7 +68,7 @@ const ja = {
   unknown: "(不明)",
   allowedDirs: "許可フォルダ",
   allowedDirsNone: "(なし — 都度確認)",
-  settingsNote: "プロバイダー / モデル / 他のファイルの参照の変更は「新しいチャット」後の新しいセッションから有効になります。API キーはこの PC の ",
+  settingsNote: "プロバイダー / モデル / 他のファイルの参照の変更は、設定を閉じたときにチャットが空ならすぐ、会話中なら「新しいチャット」後に有効になります。API キーはこの PC の ",
   settingsNoteSuffix: " に保存されます。",
   back: "戻る",
   emptyIntro: {
@@ -101,6 +103,7 @@ const ja = {
   cliDisabledTip: "Copilot CLI 側で無効になっています",
   plusMenu: "メニュー",
   webSearchNextChat: "Web 検索の変更は次の新しいチャットから有効になります",
+  sessionChangeNextChat: "プロバイダ・モデルなどの変更は次の新しいチャットから有効になります",
   openPathHint: (p: string) => `ここを開いてください: ${p}`,
   copilotMcpConfig: "Copilot CLI MCP 設定",
   copilotSkillsDir: "Copilot CLI スキル",
@@ -174,6 +177,8 @@ const en: typeof ja = {
   edit: "Edit",
   delete: "Delete",
   autoApproveReadOnly: "Auto-approve read-only tool calls",
+  autoApproveOfficecli: "Auto-approve OfficeCLI commands",
+  autoApproveOfficecliHint: "Runs every officecli command, writes included, without asking.",
   workAcrossOpenFiles: "Let the agent see other open files",
   workAcrossOpenFilesHint: {
     Word: "Lists the other documents open in this Word and lets the agent read copies of them. Only this document is edited.",
@@ -187,7 +192,7 @@ const en: typeof ja = {
   unknown: "(unknown)",
   allowedDirs: "Allowed folders",
   allowedDirsNone: "(none — ask each time)",
-  settingsNote: "Provider, model and open-file access changes take effect in the new session after \"New chat\". API keys are stored on this PC in ",
+  settingsNote: "Provider, model and open-file access changes take effect when you close settings if the chat is empty, otherwise after \"New chat\". API keys are stored on this PC in ",
   settingsNoteSuffix: ".",
   back: "Back",
   emptyIntro: {
@@ -222,6 +227,7 @@ const en: typeof ja = {
   cliDisabledTip: "Disabled in Copilot CLI itself",
   plusMenu: "Menu",
   webSearchNextChat: "The web search change applies to the next new chat",
+  sessionChangeNextChat: "Provider, model and other session changes apply to the next new chat",
   openPathHint: (p: string) => `Open this location: ${p}`,
   copilotMcpConfig: "Copilot CLI MCP config",
   copilotSkillsDir: "Copilot CLI skills",

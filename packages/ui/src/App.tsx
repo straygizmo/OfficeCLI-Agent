@@ -85,6 +85,16 @@ function loadSettings(): { hostUrl: string; session: SessionSettings } {
 let counter = 0;
 const nextId = () => `${Date.now()}-${counter++}`;
 
+/** True when two settings differ in an option that only takes effect when a session starts. */
+function sessionOptionsDiffer(a: SessionSettings, b: SessionSettings): boolean {
+  return (
+    (a.provider ?? COPILOT_PROVIDER) !== (b.provider ?? COPILOT_PROVIDER) ||
+    (a.model ?? "") !== (b.model ?? "") ||
+    (a.workAcrossOpenFiles ?? false) !== (b.workAcrossOpenFiles ?? false) ||
+    (a.webSearch ?? true) !== (b.webSearch ?? true)
+  );
+}
+
 export function App({ hostApp: initialHostApp }: Props) {
   // The add-in knows the real application; the host echoes it back in `ready`.
   const [hostApp, setHostApp] = useState<HostApp>(initialHostApp);
@@ -117,6 +127,8 @@ export function App({ hostApp: initialHostApp }: Props) {
   const clientRef = useRef<HostClient | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  // Name of a BYOK provider just added; selected once the host confirms the save.
+  const addedProviderRef = useRef<string | null>(null);
 
   const append = useCallback((item: ChatItem) => setItems((prev) => [...prev, item]), []);
 
@@ -206,10 +218,19 @@ export function App({ hostApp: initialHostApp }: Props) {
         case "permission.request":
           setPermissions((prev) => [...prev, message.permission]);
           break;
-        case "providers":
+        case "providers": {
           setProviders(message.providers);
           setEditingProvider(null);
+          const added = addedProviderRef.current;
+          addedProviderRef.current = null;
+          if (added && message.providers.some((p) => p.name === added)) {
+            const session = { ...settingsRef.current.session, provider: added, model: undefined };
+            settingsRef.current = { ...settingsRef.current, session };
+            setSettings((s) => ({ ...s, session }));
+            clientRef.current?.send({ type: "settings.update", settings: session });
+          }
           break;
+        }
         case "status":
           setStatus(message.message);
           break;
@@ -368,6 +389,22 @@ export function App({ hostApp: initialHostApp }: Props) {
     }
   };
 
+  // Leaving settings: start a session with the edited provider/model right away while the chat is
+  // still empty; otherwise say they wait for the next chat. Either way the transient status goes.
+  const closeSettings = () => {
+    setShowSettings(false);
+    const session = settingsRef.current.session;
+    if (!sessionOptionsDiffer(session, activeSession)) {
+      setStatus("");
+    } else if (!items.some((i) => i.role === "user")) {
+      setActiveSession(session);
+      setStatus("");
+      clientRef.current?.sendHello(session);
+    } else {
+      setStatus(t.sessionChangeNextChat);
+    }
+  };
+
   const setMcpEnabled = (name: string, enabled: boolean) => {
     clientRef.current?.send({ type: "mcp.setEnabled", name, enabled });
     setCatalog((c) => (c ? { ...c, mcpServers: c.mcpServers.map((s) => (s.name === name ? { ...s, enabled } : s)) } : c));
@@ -408,7 +445,7 @@ export function App({ hostApp: initialHostApp }: Props) {
   }, [state]);
 
   return (
-    <div className="app">
+    <div className="app" data-host-app={hostApp}>
       <header className="topbar">
         <span className="active-model muted small" title={activeLabel}>
           {activeLabel}
@@ -420,7 +457,7 @@ export function App({ hostApp: initialHostApp }: Props) {
           <button
             onClick={() => {
               setShowHistory((s) => !s);
-              setShowSettings(false);
+              if (showSettings) closeSettings();
             }}
             title={showHistory ? t.closeHistory : t.openHistory}
             aria-label={t.history}
@@ -439,7 +476,8 @@ export function App({ hostApp: initialHostApp }: Props) {
           </button>
           <button
             onClick={() => {
-              setShowSettings((s) => !s);
+              if (showSettings) closeSettings();
+              else setShowSettings(true);
               setShowHistory(false);
             }}
             title={showSettings ? t.closeSettings : t.openSettings}
@@ -492,7 +530,7 @@ export function App({ hostApp: initialHostApp }: Props) {
       {showSettings && (
         <section className="settings panel">
           <div className="panel-head">
-            <button className="back" onClick={() => setShowSettings(false)} title={t.back} aria-label={t.back}>
+            <button className="back" onClick={closeSettings} title={t.back} aria-label={t.back}>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M19 12H5M11 18l-6-6 6-6" />
               </svg>
@@ -568,7 +606,10 @@ export function App({ hostApp: initialHostApp }: Props) {
               <ProviderEditor
                 initial={editingProvider === "new" ? undefined : editingProvider}
                 onCancel={() => setEditingProvider(null)}
-                onSave={(input: ByokProviderInput) => clientRef.current?.send({ type: "provider.save", provider: input })}
+                onSave={(input: ByokProviderInput) => {
+                  if (editingProvider === "new") addedProviderRef.current = input.name;
+                  clientRef.current?.send({ type: "provider.save", provider: input });
+                }}
               />
             )}
           </div>
@@ -577,6 +618,12 @@ export function App({ hostApp: initialHostApp }: Props) {
             onChange={(next) => updateSession({ autoApproveReadOnly: next })}
             label={t.autoApproveReadOnly}
           />
+          <Toggle
+            checked={settings.session.autoApproveOfficecli ?? false}
+            onChange={(next) => updateSession({ autoApproveOfficecli: next })}
+            label={t.autoApproveOfficecli}
+          />
+          <p className="muted small hint">{t.autoApproveOfficecliHint}</p>
           <Toggle
             checked={settings.session.workAcrossOpenFiles ?? false}
             onChange={(next) => updateSession({ workAcrossOpenFiles: next })}
@@ -684,17 +731,6 @@ export function App({ hostApp: initialHostApp }: Props) {
             e.target.value = "";
           }}
         />
-        <div className="composer-row">
-        <PlusMenu
-          disabled={state !== "ready"}
-          webSearch={settings.session.webSearch ?? true}
-          onWebSearch={setWebSearch}
-          catalog={catalog}
-          onMcpToggle={setMcpEnabled}
-          onSkillToggle={setSkillEnabled}
-          onAddFiles={() => fileInputRef.current?.click()}
-          onOpenPath={openPath}
-        />
         <div className="input-wrap">
           <AttachmentChips items={pending.map((p) => ({ id: p.id, name: p.file.name, size: p.file.size, previewUrl: p.previewUrl }))} onRemove={removePending} />
           <textarea
@@ -720,6 +756,18 @@ export function App({ hostApp: initialHostApp }: Props) {
             }}
             rows={4}
           />
+          <div className="input-tools">
+            <PlusMenu
+              disabled={state !== "ready"}
+              webSearch={settings.session.webSearch ?? true}
+              onWebSearch={setWebSearch}
+              catalog={catalog}
+              onMcpToggle={setMcpEnabled}
+              onSkillToggle={setSkillEnabled}
+              onAddFiles={() => fileInputRef.current?.click()}
+              onOpenPath={openPath}
+            />
+          </div>
           <div className="input-action">
             {busy ? (
               <button className="icon stop" onClick={abort} title={t.stop} aria-label={t.stop}>
@@ -735,7 +783,6 @@ export function App({ hostApp: initialHostApp }: Props) {
               </button>
             )}
           </div>
-        </div>
         </div>
       </footer>
       </>

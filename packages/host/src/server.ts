@@ -155,6 +155,7 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
               provider: message.settings?.provider ?? config.defaultProvider,
               model: message.settings?.model ?? config.model,
               autoApproveReadOnly: message.settings?.autoApproveReadOnly ?? config.autoApproveReadOnly,
+              autoApproveOfficecli: message.settings?.autoApproveOfficecli ?? false,
               workAcrossOpenFiles: message.settings?.workAcrossOpenFiles ?? false,
               webSearch: message.settings?.webSearch ?? true,
             },
@@ -173,15 +174,8 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
           await current?.abort();
           return current;
         case "settings.update":
+          // Session-creation options (provider, model, ...) wait for the next hello; the task pane says when.
           current?.updateSettings(message.settings);
-          if (
-            message.settings.model !== undefined ||
-            message.settings.provider !== undefined ||
-            message.settings.workAcrossOpenFiles !== undefined ||
-            message.settings.webSearch !== undefined
-          ) {
-            link.status("Provider, model, open-file access and web search changes apply to the next new chat.");
-          }
           return current;
         case "provider.save":
           upsertProvider(config, message.provider);
