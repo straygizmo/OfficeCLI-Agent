@@ -133,10 +133,14 @@ export interface ByokProviderInput {
   /** Unique display name, e.g. "OpenAI", "Ollama (local)". */
   name: string;
   type: ByokProviderType;
-  /** e.g. https://api.openai.com/v1, http://localhost:11434/v1, https://api.anthropic.com */
+  /** e.g. https://api.openai.com/v1, http://localhost:11434/v1, https://api.anthropic.com. May be empty for azure with `resourceNameEnv`. */
   baseUrl: string;
   /** Omit to keep the stored key when updating; empty string clears it. */
   apiKey?: string;
+  /** Environment variable holding the key, used when no key is entered. Omit to keep; empty string clears it. */
+  apiKeyEnv?: string;
+  /** Azure only: environment variable holding the resource name, used when no base URL is entered. Omit to keep; empty clears. */
+  resourceNameEnv?: string;
   /** Default model id for this provider (required by the runtime for BYOK). */
   model?: string;
   /** openai/azure only. */
@@ -153,7 +157,13 @@ export interface ProviderSummary {
   type: ByokProviderType | "copilot";
   baseUrl?: string;
   model?: string;
+  azureApiVersion?: string;
+  /** Environment variable names (not their values). */
+  apiKeyEnv?: string;
+  resourceNameEnv?: string;
   hasApiKey: boolean;
+  /** Where the key in effect comes from: entered in the pane, or an environment variable. */
+  apiKeySource?: "stored" | "env";
 }
 
 /** Task pane UI language: Japanese for Japanese environments, English otherwise. */

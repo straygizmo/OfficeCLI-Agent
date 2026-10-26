@@ -590,7 +590,7 @@ export function App({ hostApp: initialHostApp }: Props) {
               .map((p) => (
                 <div key={p.name} className="provider-row">
                   <span>
-                    <strong>{p.name}</strong> <span className="muted small">{p.type} · {p.baseUrl}</span>
+                    <strong>{p.name}</strong> <span className="muted small">{p.type} · {p.baseUrl || (p.resourceNameEnv && `%${p.resourceNameEnv}%`)}</span>
                   </span>
                   <span>
                     <button className="small-btn" onClick={() => setEditingProvider(p)}>

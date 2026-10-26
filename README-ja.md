@@ -134,7 +134,7 @@ URL に `&lang=ja` / `&lang=en` を付けると表示言語を固定できます
   "providers": [
     { "name": "openai", "type": "openai", "baseUrl": "https://api.openai.com/v1", "apiKeyEnv": "OPENAI_API_KEY", "model": "gpt-6-luna" },
     { "name": "anthropic", "type": "anthropic", "baseUrl": "https://api.anthropic.com", "apiKey": "sk-ant-…", "model": "claude-sonnet-5.5" },
-    { "name": "azure", "type": "azure", "baseUrl": "https://<resource>.openai.azure.com", "apiKey": "…", "model": "gpt-6-luna", "azureApiVersion": "2024-10-21" },
+    { "name": "azure", "type": "azure", "baseUrl": "", "resourceNameEnv": "AZURE_RESOURCE_NAME", "apiKeyEnv": "AZURE_OPENAI_API_KEY", "model": "gpt-6-luna", "azureApiVersion": "2024-10-21" },
     { "name": "ollama", "type": "openai", "baseUrl": "http://localhost:11434/v1", "model": "llama3.1", "modelProvider": "ollama" }
   ]
 }
@@ -142,7 +142,9 @@ URL に `&lang=ja` / `&lang=en` を付けると表示言語を固定できます
 
 - `type`: `openai`（OpenAI 互換全般: OpenAI / Ollama / vLLM / LiteLLM / LM Studio / Foundry Local）、`azure`（Azure OpenAI ネイティブ）、`anthropic`。
 - `wireApi`: 省略時は OpenAI（`api.openai.com`）と Azure OpenAI は `responses`（gpt-5.6 以降を前提）、それ以外の OpenAI 互換サーバーは `completions`。必要なら明示できます。Azure の `model` はデプロイ名です。
-- `apiKey` の代わりに `apiKeyEnv` で環境変数名を指定できます。ローカルモデルはキー不要。
+- `apiKeyEnv` で API キーを読む環境変数名を指定できます（タスクペインの「API キーの環境変数」）。`apiKey` を直接入力した場合はそちらが優先されます。ローカルモデルはキー不要。
+- Azure は `resourceNameEnv` でリソース名の環境変数を指定でき、`baseUrl` が空なら `https://<リソース名>.openai.azure.com` を使います。`baseUrl` を入力した場合はそちらが優先されます。Azure プリセットは `AZURE_OPENAI_API_KEY` / `AZURE_RESOURCE_NAME` を既定で設定します。
+- 環境変数はホスト起動時（Office 起動時）の値が使われます。設定・変更した後は Office を再起動してください。
 - BYOK ではモデル ID が必須です（プロバイダーの既定 `model`、またはタスクペインで入力）。
 - BYOK 時の利用量・レート制限はそのプロバイダー側のもので、Copilot のプレミアムリクエストは消費しません。ツール呼び出しを扱えるモデルを選んでください（Ollama なら Llama 3.1 以上、Qwen 2.5 系など）。
 
