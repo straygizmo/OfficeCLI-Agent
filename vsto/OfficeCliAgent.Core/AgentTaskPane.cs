@@ -15,7 +15,9 @@ namespace OfficeCliAgent.Core
     public sealed class AgentTaskPane : UserControl
     {
         private const string VirtualHost = "officecli-agent.local";
-        private readonly WebView2 _web = new WebView2 { Dock = DockStyle.Fill };
+        private const int InitAttempts = 3;
+        private static Task<CoreWebView2Environment> _sharedEnvironment;
+        private WebView2 _web;
         private readonly Label _status = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Padding = new Padding(12), AutoSize = false };
         private bool _ready;
 
@@ -26,9 +28,34 @@ namespace OfficeCliAgent.Core
         {
             Dock = DockStyle.Fill;
             Controls.Add(_status);
-            Controls.Add(_web);
-            _web.Visible = false;
+            _web = NewWebView();
             _status.Text = UiLanguage.T("起動中…", "Starting…");
+        }
+
+        private WebView2 NewWebView()
+        {
+            var web = new WebView2 { Dock = DockStyle.Fill, Visible = false };
+            Controls.Add(web);
+            return web;
+        }
+
+        /// <summary>
+        /// One WebView2 environment per Office process, shared by every pane (one per document window).
+        /// Every WebView2 in a process must be created with identical browser options, and Office
+        /// changes WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS in its own process while it runs
+        /// (https://github.com/MicrosoftEdge/WebView2Feedback/issues/5770): an environment created
+        /// later picks up different arguments and its controllers fail with 0x8007139F.
+        /// </summary>
+        private static Task<CoreWebView2Environment> SharedEnvironmentAsync()
+        {
+            var task = _sharedEnvironment;
+            if (task == null || task.IsFaulted || task.IsCanceled)
+            {
+                Log.Write("webview: creating the environment (extra browser arguments: "
+                    + (Environment.GetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") ?? "none") + ")");
+                task = _sharedEnvironment = CoreWebView2Environment.CreateAsync(null, AgentSettings.WebViewDataDir);
+            }
+            return task;
         }
 
         public async Task InitializeAsync(AgentSettings settings, string hostApp)
@@ -45,11 +72,29 @@ namespace OfficeCliAgent.Core
 
             try
             {
-                var env = await CoreWebView2Environment.CreateAsync(null, AgentSettings.WebViewDataDir);
-                await _web.EnsureCoreWebView2Async(env);
+                var env = await SharedEnvironmentAsync();
+                // Office may re-create the pane's window while attaching it to a document window;
+                // a controller created against a handle that went away fails, so try again with a
+                // fresh control a couple of times before showing the error.
+                for (var attempt = 1; ; attempt++)
+                {
+                    try
+                    {
+                        await _web.EnsureCoreWebView2Async(env);
+                        break;
+                    }
+                    catch (Exception ex) when (attempt < InitAttempts && !IsDisposed)
+                    {
+                        Log.Write($"webview: init attempt {attempt} failed ({ex.Message.Trim()}); retrying with a new control");
+                        _web.Dispose();
+                        _web = NewWebView();
+                        await Task.Delay(300 * attempt);
+                    }
+                }
             }
             catch (Exception ex)
             {
+                if (IsDisposed) return;
                 ShowError(UiLanguage.T(
                     "WebView2 を初期化できません。Microsoft Edge WebView2 ランタイムをインストールしてください。",
                     "Could not initialize WebView2. Install the Microsoft Edge WebView2 Runtime.")
