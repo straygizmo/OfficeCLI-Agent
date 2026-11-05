@@ -35,7 +35,7 @@ OfficeCliAgent.PowerPoint/OfficeCliAgent.PowerPoint.sln  PowerPoint (PowerPointO
 
 ## 動作の流れ
 
-1. ボタンでタスクペインを開く → `AgentTaskPane` が WebView2 を初期化し、`packages/ui/dist` を `https://officecli-agent.local/` にマップして表示。
+1. 文書ウィンドウごとにタスクペインを作る（Office 2013 以降は文書ごとに別ウィンドウで、カスタム タスクペインは 1 つのウィンドウにしか属せないため。`WindowPaneRegistry` が HWND で管理し、閉じたウィンドウの分は破棄）→ `AgentTaskPane` が WebView2 を初期化し、`packages/ui/dist` を `https://officecli-agent.local/` にマップして表示。WebView2 の環境はプロセスで 1 つを共有する（PowerPoint が実行中に `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` を変えるため、後から作った環境では 0x8007139F になる）。
 2. `HostProcessManager` が `127.0.0.1:4320` を確認。何も居なければ `node packages/host/dist/cli.js --port 4320 --no-tls --idle-exit 900` を非表示で起動。
 3. `HostRelay` が `ws://127.0.0.1:4320/ws` に接続。ページの `hello` に実際のアプリ名・文書名を書き込んで転送。
 4. エージェントのツール呼び出しのうち `office.request` だけを横取りし、Office の UI スレッドで COM 実行して `office.result` を返す。それ以外のフレームはそのままページへ流す。
