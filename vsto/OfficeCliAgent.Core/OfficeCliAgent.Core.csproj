@@ -13,7 +13,7 @@
     <RootNamespace>OfficeCliAgent.Core</RootNamespace>
     <AssemblyName>OfficeCliAgent.Core</AssemblyName>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>0.1.2</Version>
+    <Version>0.1.3</Version>
     <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
 
