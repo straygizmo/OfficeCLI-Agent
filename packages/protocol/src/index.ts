@@ -74,7 +74,7 @@ export type OfficeOp =
   | { kind: "insertImage"; path: string; options?: InsertImageOptions }
   // ---- Word ----
   | { kind: "word.getSelection" }
-  | { kind: "word.insertText"; text: string; location: "Selection" | "Start" | "End"; style?: string }
+  | { kind: "word.insertText"; text: string; location: "Selection" | "Start" | "End"; style?: string; list?: "bullet" | "number" }
   | { kind: "word.replaceText"; find: string; replace: string; matchCase?: boolean; replaceAll?: boolean }
   // ---- Excel ----
   | { kind: "excel.listSheets" }
