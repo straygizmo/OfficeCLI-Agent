@@ -4,6 +4,10 @@ English | [日本語](README-ja.md)
 
 An open-source AI agent **VSTO add-in** for Word / Excel / PowerPoint (Windows desktop).
 
+![The task pane in Word summarising the open document and changing its title](docs/images/word-en.png)
+
+*In Word: the agent lists the key points of the open document in the chat and changes the document title.*
+
 - **Agent**: [GitHub Copilot SDK](https://github.com/microsoft/copilot-sdk) (the agent runtime of Copilot CLI). Works with either a Copilot subscription (CLI sign-in) or **BYOK** (your own keys for OpenAI / Azure OpenAI / Anthropic / Ollama, etc.). There is no custom OAuth implementation.
 - **Document editing**: [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) is wired in as a host-side tool (the host runs the CLI directly). It enables high-fidelity OOXML-level editing: pivots, tracked changes, animations, equations, Mermaid diagrams, template merges, issue diagnostics, screenshots and more.
 - **Live editing**: Reads and writes the *currently open* document directly through the Office COM object model (undoable).
