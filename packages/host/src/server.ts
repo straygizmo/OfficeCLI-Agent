@@ -9,7 +9,8 @@ import { CopilotClient, RuntimeConnection, type Model } from "@microsoft/copilot
 import { WebSocketServer, type WebSocket } from "ws";
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MAX_FILES, PROTOCOL_VERSION, WS_PATH, isClientMessage, type ClientMessage, type ModelSummary } from "@officecli-agent/protocol";
 import { AgentSession } from "./agent-session.js";
-import { deleteProvider, setMcpServerEnabled, setSkillEnabled, summarizeProviders, upsertProvider, type HostConfig } from "./config.js";
+import { deleteImageProvider, deleteProvider, imageProviderForListing, saveImageProvider, setMcpServerEnabled, setSkillEnabled, summarizeImageProvider, summarizeProviders, upsertProvider, type HostConfig } from "./config.js";
+import { listImageModels } from "./image-gen.js";
 import { TaskpaneLink } from "./taskpane-link.js";
 import { applyToggleToSessions } from "./toggles.js";
 
@@ -157,6 +158,7 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
             hostBuild: hostBuildStamp(),
             models,
             providers: summarizeProviders(config),
+            imageProvider: summarizeImageProvider(config),
             settings: {
               provider: message.settings?.provider ?? config.defaultProvider,
               model: message.settings?.model ?? config.model,
@@ -192,6 +194,24 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
           deleteProvider(config, message.name);
           link.send({ type: "providers", providers: summarizeProviders(config) });
           link.status(`Provider '${message.name}' removed.`);
+          return current;
+        case "imageProvider.save":
+          saveImageProvider(config, message.provider);
+          link.send({ type: "imageProvider", imageProvider: summarizeImageProvider(config) });
+          link.status("Image generation provider saved.");
+          return current;
+        case "imageProvider.delete":
+          deleteImageProvider(config);
+          link.send({ type: "imageProvider" });
+          link.status("Image generation provider removed.");
+          return current;
+        case "imageProvider.listModels":
+          try {
+            const models = await listImageModels(imageProviderForListing(config.imageProvider, message.provider));
+            link.send({ type: "imageProvider.models", requestId: message.requestId, models });
+          } catch (err) {
+            link.send({ type: "imageProvider.models", requestId: message.requestId, models: [], error: (err as Error).message ?? String(err) });
+          }
           return current;
         case "mcp.setEnabled":
           setMcpServerEnabled(config, message.name, message.enabled);

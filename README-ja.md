@@ -12,6 +12,7 @@ Word / Excel / PowerPoint（Windows デスクトップ版）に組み込む、�
 - **文書編集**: [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) をホスト側のツールとして接続（ホストが CLI を直接実行）。ピボット、変更履歴、アニメーション、数式、Mermaid 図、テンプレート差し込み、問題診断、スクリーンショットなど OOXML レベルの編集を高精度に行えます。
 - **ライブ編集**: Office の COM オブジェクトモデルで「いま開いている文書」を直接読み書き（Undo 可）。
 - **他ファイルの取り込み**: PC 上の `.docx` / `.xlsx` / `.pptx` をエージェントが読み、開いている文書へ差し込みます（Word: 本文/選択範囲へ挿入、PowerPoint: スライド挿入、Excel: シート追加）。
+- **画像の生成**: タスクペインで画像生成プロバイダー（OpenAI `gpt-image-2.6-flare`、Google Gemini「Nano Banana 2」、Azure OpenAI、または OpenAI Images API 互換のサーバー）を設定すると、「〜の画像を生成してここに挿入して」という依頼でエージェントが画像を生成し（`office_generate_image`）、開いている文書へ挿入します。[画像生成](#画像生成) を参照。
 - **画像の挿入**: `office_insert_image` で PNG / JPEG / GIF / BMP / TIFF / SVG / EMF / WMF を開いている文書へ挿入します（Word: 選択位置、Excel: 指定セル、PowerPoint: スライド上）。
 
 タスクペインとリボンの表示言語は Office の UI 言語に合わせて切り替わります（日本語環境では日本語、それ以外は英語）。
@@ -151,6 +152,25 @@ URL に `&lang=ja` / `&lang=en` を付けると表示言語を固定できます
 - 環境変数はホスト起動時（Office 起動時）の値が使われます。設定・変更した後は Office を再起動してください。
 - BYOK ではモデル ID が必須です（プロバイダーの既定 `model`、またはタスクペインで入力）。
 - BYOK 時の利用量・レート制限はそのプロバイダー側のもので、Copilot のプレミアムリクエストは消費しません。ツール呼び出しを扱えるモデルを選んでください（Ollama なら Llama 3.1 以上、Qwen 2.5 系など）。
+
+## 画像生成
+
+タスクペインの「設定 → 画像生成 → 追加」でプロバイダーを設定します（プリセット: OpenAI / Google Gemini (Nano Banana 2) / Azure OpenAI）。チャット用のプロバイダーとは独立しているので、Copilot やローカルモデルでチャットしている場合も使えます。保存後、チャットで「灯台の水彩イラストを生成してカーソル位置に挿入して」のように依頼してください。エージェントが `office_generate_image` を呼び（画像はセッションの作業フォルダの `images\` に保存）、続けて `office_insert_image` で挿入します。保存した設定は実行中のチャットにも即時反映されます。
+
+```jsonc
+{
+  "imageProvider": { "type": "openai", "baseUrl": "https://api.openai.com/v1", "model": "gpt-image-2.6-flare", "apiKeyEnv": "OPENAI_API_KEY" }
+  // Google Gemini (Nano Banana 2)
+  // "imageProvider": { "type": "gemini", "baseUrl": "https://generativelanguage.googleapis.com/v1beta", "model": "gemini-3.1-flash-image", "apiKeyEnv": "GEMINI_API_KEY" }
+  // Azure OpenAI: "model" はデプロイ名
+  // "imageProvider": { "type": "azure", "baseUrl": "https://<resource>.openai.azure.com", "model": "<deployment>", "apiKeyEnv": "AZURE_OPENAI_API_KEY", "azureApiVersion": "2025-04-01-preview" }
+}
+```
+
+- `type: "openai"` は `POST <baseUrl>/images/generations` を呼ぶので、OpenAI Images API を実装した他のサーバーも使えます。`type: "azure"` は `<baseUrl>/openai/deployments/<model>/images/generations` を呼びます。`type: "gemini"` は `<baseUrl>/models/<model>:generateContent` を呼ぶので、`model` を変えれば他の Gemini 画像モデル（`gemini-3-pro-image` など）も使えます。
+- `apiKey` / `apiKeyEnv` / `resourceNameEnv` の扱いは BYOK プロバイダーと同じです。キーがタスクペインに返されることはありません。
+- OpenAI 互換と Gemini では、フォームがプロバイダーの画像モデル一覧を取得し（プリセットや種類を選んだとき、またはキー入力後に「モデルを取得」）、プルダウンから選べます。「その他（手入力）…」で任意の ID も指定できます。一覧はモデル名で絞り込んでいるので、変わった名前の新モデルは手入力が必要な場合があります。Azure のデプロイは API キーでは一覧できないため、デプロイ名を手入力します。
+- 縦横比（正方形 / 横長 / 縦長）はエージェントが選びます。1 回の呼び出しで 1 枚です。画像のプロンプトはこのプロバイダーに送信され、利用料金もプロバイダー側で発生します。
 
 ## 入力欄のメニュー（「+」）
 

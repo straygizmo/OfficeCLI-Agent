@@ -62,6 +62,8 @@ export class AgentSession {
       allowedDirectories: config.allowedDirectories,
       permissionTimeoutMs: config.permissionTimeoutSeconds * 1000,
       workAcrossOpenFiles,
+      // Read on every call: a provider saved from the pane works in the running chat.
+      imageProvider: () => config.imageProvider,
     });
 
     const { provider, model } = this.resolveProvider();

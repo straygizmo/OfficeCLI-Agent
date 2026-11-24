@@ -1,10 +1,16 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { COPILOT_PROVIDER, DEFAULT_PORT, type ByokProviderInput, type ProviderSummary } from "@officecli-agent/protocol";
+import { COPILOT_PROVIDER, DEFAULT_PORT, type ByokProviderInput, type ImageModelsQuery, type ImageProviderInput, type ImageProviderSummary, type ProviderSummary } from "@officecli-agent/protocol";
 
 /** A BYOK provider as stored in config.json (includes the secret). */
 export interface StoredProvider extends ByokProviderInput {
+  /** Extra HTTP headers for the provider. */
+  headers?: Record<string, string>;
+}
+
+/** The image generation provider as stored in config.json (includes the secret). */
+export interface StoredImageProvider extends ImageProviderInput {
   /** Extra HTTP headers for the provider. */
   headers?: Record<string, string>;
 }
@@ -16,6 +22,8 @@ export interface HostConfig {
   defaultProvider: string;
   /** BYOK providers selectable from the task pane. */
   providers: StoredProvider[];
+  /** Image generation provider behind the office_generate_image tool (the tool reports "not configured" when undefined). */
+  imageProvider?: StoredImageProvider;
   /** Default Copilot model id (CLI default when undefined). */
   model?: string;
   /** Directories the agent may read/write on this PC, besides the workspace. */
@@ -100,6 +108,7 @@ export function loadConfig(overrides: Partial<HostConfig> = {}): HostConfig {
   merged.certDir = expandHome(merged.certDir);
   merged.workspaceRoot = expandHome(merged.workspaceRoot);
   merged.providers = Array.isArray(merged.providers) ? merged.providers : [];
+  if (!merged.imageProvider || typeof merged.imageProvider !== "object") delete merged.imageProvider;
   merged.disabledMcpServers = Array.isArray(merged.disabledMcpServers) ? merged.disabledMcpServers : [];
   merged.disabledSkills = Array.isArray(merged.disabledSkills) ? merged.disabledSkills : [];
   fs.mkdirSync(merged.workspaceRoot, { recursive: true });
@@ -117,7 +126,7 @@ function fromEnv(name: string | undefined): string | undefined {
 }
 
 /** A key entered in the pane wins; otherwise the `apiKeyEnv` variable. */
-export function resolveApiKey(provider: StoredProvider): string | undefined {
+export function resolveApiKey(provider: { apiKey?: string; apiKeyEnv?: string }): string | undefined {
   return provider.apiKey || fromEnv(provider.apiKeyEnv);
 }
 
@@ -130,7 +139,7 @@ function baseUrlMissing(baseUrl: string | undefined): boolean {
  * A base URL entered in the pane wins; for Azure without one, it is built from the
  * resource name in `resourceNameEnv` (https://<resource>.openai.azure.com).
  */
-export function resolveBaseUrl(provider: StoredProvider): string | undefined {
+export function resolveBaseUrl(provider: { type: string; baseUrl: string; resourceNameEnv?: string }): string | undefined {
   if (!baseUrlMissing(provider.baseUrl)) return provider.baseUrl.trim();
   if (provider.type !== "azure") return undefined;
   const resource = fromEnv(provider.resourceNameEnv);
@@ -189,6 +198,74 @@ export function deleteProvider(config: HostConfig, name: string): void {
   config.providers = config.providers.filter((p) => p.name !== name);
   if (config.defaultProvider === name) config.defaultProvider = COPILOT_PROVIDER;
   saveConfig(config);
+}
+
+/**
+ * The image provider after applying task-pane input. An omitted apiKey / *Env keeps the stored one;
+ * fields only editable in config.json (headers) are kept.
+ */
+export function mergeImageProvider(existing: StoredImageProvider | undefined, input: ImageProviderInput): StoredImageProvider {
+  const model = input.model?.trim();
+  if (!model) throw new Error("An image model id is required.");
+  const baseUrl = (input.baseUrl ?? "").trim();
+  const resourceNameEnv = input.type === "azure" ? (input.resourceNameEnv ?? existing?.resourceNameEnv)?.trim() : "";
+  if (baseUrl ? !/^https?:\/\//i.test(baseUrl) : !resourceNameEnv) {
+    throw new Error("baseUrl must start with http:// or https:// (Azure: or set the resource name environment variable)");
+  }
+  const next: StoredImageProvider = {
+    ...(existing ?? {}),
+    type: input.type,
+    baseUrl,
+    model,
+    azureApiVersion: input.azureApiVersion?.trim() || undefined,
+  };
+  if (input.apiKey !== undefined) next.apiKey = input.apiKey.trim() || undefined;
+  if (input.apiKeyEnv !== undefined) next.apiKeyEnv = input.apiKeyEnv.trim() || undefined;
+  next.resourceNameEnv = resourceNameEnv || undefined;
+  return next;
+}
+
+/**
+ * The provider to list models from, for the (unsaved) form values. The stored key, key variable and
+ * headers are reused only for the stored type and base URL, so a stored key never goes to another endpoint.
+ */
+export function imageProviderForListing(stored: StoredImageProvider | undefined, query: ImageModelsQuery): StoredImageProvider {
+  const baseUrl = (query.baseUrl ?? "").trim();
+  const same = stored && stored.type === query.type && (stored.baseUrl ?? "").trim() === baseUrl ? stored : undefined;
+  return {
+    type: query.type,
+    baseUrl,
+    model: "",
+    apiKey: query.apiKey?.trim() || same?.apiKey,
+    apiKeyEnv: query.apiKeyEnv !== undefined ? query.apiKeyEnv.trim() || undefined : same?.apiKeyEnv,
+    resourceNameEnv: query.resourceNameEnv?.trim() || undefined,
+    headers: same?.headers,
+  };
+}
+
+export function saveImageProvider(config: HostConfig, input: ImageProviderInput): void {
+  config.imageProvider = mergeImageProvider(config.imageProvider, input);
+  saveConfig(config);
+}
+
+export function deleteImageProvider(config: HostConfig): void {
+  delete config.imageProvider;
+  saveConfig(config);
+}
+
+export function summarizeImageProvider(config: HostConfig): ImageProviderSummary | undefined {
+  const p = config.imageProvider;
+  if (!p) return undefined;
+  return {
+    type: p.type,
+    baseUrl: p.baseUrl,
+    model: p.model,
+    azureApiVersion: p.azureApiVersion,
+    apiKeyEnv: p.apiKeyEnv,
+    resourceNameEnv: p.resourceNameEnv,
+    hasApiKey: Boolean(resolveApiKey(p)),
+    apiKeySource: p.apiKey ? "stored" : fromEnv(p.apiKeyEnv) ? "env" : undefined,
+  };
 }
 
 /** `list` with `name` present or absent, without duplicates, order kept. */

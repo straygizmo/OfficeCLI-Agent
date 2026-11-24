@@ -8,6 +8,10 @@ test("system prompt tells the agent where attachments live", () => {
   assert.match(text, /office_insert_image/);
 });
 
+test("system prompt chains image generation into insertion", () => {
+  assert.match(buildSystemPrompt("PowerPoint", "C:\\ws", true), /office_generate_image: .*office_insert_image/);
+});
+
 test("system prompt routes officecli through the tool, with stdin for piped input", () => {
   const text = buildSystemPrompt("Excel", "C:\\ws", true);
   assert.match(text, /never through the shell/);
