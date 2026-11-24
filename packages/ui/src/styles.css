@@ -10,6 +10,8 @@
   --ok: #107c10;
   --err: #c50f1f;
   --warn: #fff4ce;
+  --code-bg: rgba(0, 0, 0, 0.06);
+  --link: #0f6cbd;
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
   color: var(--fg);
@@ -24,6 +26,8 @@
     --user: #1e3a5f;
     --assistant: #2b2b2b;
     --warn: #4a3f1a;
+    --code-bg: rgba(255, 255, 255, 0.1);
+    --link: #6cb6ff;
   }
 }
 * { box-sizing: border-box; }
@@ -57,7 +61,35 @@ button:disabled { opacity: 0.5; cursor: default; }
 .msg { padding: 8px 10px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
 .msg.user { background: var(--user); align-self: flex-end; max-width: 92%; }
 .msg.assistant { background: var(--assistant); align-self: flex-start; max-width: 96%; }
-.msg.assistant.streaming::after { content: "▍"; animation: blink 1s steps(1) infinite; }
+/* The streaming cursor sits at the end of the last Markdown block (or alone while the reply is still empty). */
+.msg.assistant.streaming:empty::after,
+.msg.assistant.streaming > :last-child::after { content: "▍"; animation: blink 1s steps(1) infinite; }
+/* Assistant replies are rendered as Markdown: blocks carry the spacing, not pre-wrap. */
+.msg.md { white-space: normal; }
+.msg.md > :first-child { margin-top: 0; }
+.msg.md > :last-child { margin-bottom: 0; }
+.msg.md p, .msg.md ul, .msg.md ol, .msg.md pre, .msg.md blockquote, .msg.md .md-table { margin: 0 0 8px; }
+.msg.md h1, .msg.md h2, .msg.md h3, .msg.md h4, .msg.md h5, .msg.md h6 { margin: 12px 0 6px; line-height: 1.3; font-weight: 600; }
+.msg.md h1 { font-size: 1.25em; }
+.msg.md h2 { font-size: 1.15em; }
+.msg.md h3 { font-size: 1.05em; }
+.msg.md h4, .msg.md h5, .msg.md h6 { font-size: 1em; }
+.msg.md ul, .msg.md ol { padding-left: 20px; }
+.msg.md li { margin: 2px 0; }
+.msg.md li > p { margin: 0; }
+.msg.md li > ul, .msg.md li > ol { margin: 2px 0 0; }
+.msg.md li.task-list-item { list-style: none; margin-left: -18px; }
+.msg.md a { color: var(--link); }
+.msg.md code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.92em; background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+.msg.md pre { background: var(--code-bg); padding: 8px; border-radius: 6px; overflow-x: auto; white-space: pre; line-height: 1.35; }
+.msg.md pre code { background: none; padding: 0; font-size: 12px; }
+.msg.md blockquote { border-left: 3px solid var(--border); padding-left: 8px; color: var(--muted); }
+.msg.md hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+.msg.md .md-table { overflow-x: auto; }
+.msg.md table { border-collapse: collapse; font-size: 12px; }
+.msg.md th, .msg.md td { border: 1px solid var(--border); padding: 3px 6px; text-align: left; vertical-align: top; }
+.msg.md th { background: var(--code-bg); font-weight: 600; }
+.msg.md img { max-width: 100%; }
 @keyframes blink { 50% { opacity: 0; } }
 .msg.system { color: var(--err); font-size: 12px; }
 .tool { font-size: 12px; color: var(--muted); padding: 4px 8px; border-left: 2px solid var(--border); cursor: pointer; }

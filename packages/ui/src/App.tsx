@@ -13,6 +13,7 @@ import {
   type SessionSettings,
 } from "@officecli-agent/protocol";
 import { AttachmentChips } from "./AttachmentChips";
+import { Markdown } from "./Markdown";
 import { PlusMenu } from "./PlusMenu";
 import { acceptFiles, makeThumbnail, mimeTypeOf, readAsBase64, type PendingAttachment, type ShownAttachment } from "./attachments";
 import { ProviderEditor } from "./ProviderEditor";
@@ -807,7 +808,11 @@ function ChatRow({ item }: { item: ChatItem }) {
         </div>
       );
     case "assistant":
-      return <div className={`msg assistant${item.streaming ? " streaming" : ""}`}>{item.text}</div>;
+      return (
+        <div className={`msg assistant md${item.streaming ? " streaming" : ""}`}>
+          <Markdown text={item.text} />
+        </div>
+      );
     case "system":
       return <div className="msg system">{item.text}</div>;
     case "tool": {
