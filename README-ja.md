@@ -4,7 +4,7 @@
 
 Word / Excel / PowerPoint（Windows デスクトップ版）に組み込む、オープンソースの AI エージェント **VSTO アドイン**です。
 
-- **エージェント**: [GitHub Copilot SDK](https://github.com/github/copilot-sdk)（Copilot CLI のエージェントランタイム）。Copilot のサブスクリプション（CLI ログイン）か、**BYOK**（OpenAI / Azure OpenAI / Anthropic / Ollama などの自前キー）のどちらでも動きます。OAuth の独自実装はありません。
+- **エージェント**: [GitHub Copilot SDK](https://github.com/microsoft/copilot-sdk)（Copilot CLI のエージェントランタイム）。Copilot のサブスクリプション（CLI ログイン）か、**BYOK**（OpenAI / Azure OpenAI / Anthropic / Ollama などの自前キー）のどちらでも動きます。OAuth の独自実装はありません。
 - **文書編集**: [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) をホスト側のツールとして接続（ホストが CLI を直接実行）。ピボット、変更履歴、アニメーション、数式、Mermaid 図、テンプレート差し込み、問題診断、スクリーンショットなど OOXML レベルの編集を高精度に行えます。
 - **ライブ編集**: Office の COM オブジェクトモデルで「いま開いている文書」を直接読み書き（Undo 可）。
 - **他ファイルの取り込み**: PC 上の `.docx` / `.xlsx` / `.pptx` をエージェントが読み、開いている文書へ差し込みます（Word: 本文/選択範囲へ挿入、PowerPoint: スライド挿入、Excel: シート追加）。
@@ -60,7 +60,7 @@ Excel だけは既存シートを差し替えず「シート追加」または�
 
 - Windows 10/11 **x64**、Windows 版 Microsoft 365 / Office 2021 以降
 - Microsoft Edge WebView2 ランタイム（Windows 11 / Microsoft 365 環境なら通常入っています）
-- [Node.js](https://nodejs.org/) 20.19 以上の **x64** 版（`node` が PATH にある）。無い場合はインストーラが警告します
+- [Node.js](https://nodejs.org/) 20.19 以上（20 系）または 22.12 以上の **x64** 版（`node` が PATH にある）。無い場合はインストーラが警告します
 - [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI)（`officecli` が PATH にある。`irm https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.ps1 | iex`）。任意ですが推奨: 無いと高度な文書編集ツールが無効になります
 - 使うモデルを次のどちらかで用意:
   - **BYOK**（動作確認済み）: OpenAI / Azure OpenAI / Anthropic / Ollama などの自前キーやローカルモデルをタスクペインから登録します。[BYOK](#byok自前の-api-キー--ローカルモデル) を参照
@@ -196,7 +196,7 @@ OfficeCLI の `view … screenshot` / `stats` は既定（`--render auto`）で 
 このプロジェクトは次のオープンソースの上に成り立っています。
 
 - **[OfficeCLI](https://github.com/iOfficeAI/OfficeCLI)** (iOfficeAI, Apache-2.0) — Word / Excel / PowerPoint ファイルの読み書き・レンダリング・診断を担う文書エンジン。本アドインの「高度な編集機能」はすべて OfficeCLI の CLI をホストから呼び出して実現しています。
-- **[GitHub Copilot SDK](https://github.com/github/copilot-sdk)** (GitHub, MIT) — エージェントランタイム。ツール呼び出しループ、MCP 接続、BYOK、権限制御は Copilot SDK / Copilot CLI の機能です。
+- **[GitHub Copilot SDK](https://github.com/microsoft/copilot-sdk)** (Microsoft / GitHub, MIT) — エージェントランタイム。ツール呼び出しループ、MCP 接続、BYOK、権限制御は Copilot SDK / Copilot CLI の機能です。
 - [office-agents](https://github.com/hewliyang/office-agents) (hewliyang, MIT) — Office アドインに BYOK エージェントを組み込むという設計の参考にしました。
 - [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) — タスクペインの UI ホスト。
 

@@ -4,7 +4,7 @@ English | [日本語](README-ja.md)
 
 An open-source AI agent **VSTO add-in** for Word / Excel / PowerPoint (Windows desktop).
 
-- **Agent**: [GitHub Copilot SDK](https://github.com/github/copilot-sdk) (the agent runtime of Copilot CLI). Works with either a Copilot subscription (CLI sign-in) or **BYOK** (your own keys for OpenAI / Azure OpenAI / Anthropic / Ollama, etc.). There is no custom OAuth implementation.
+- **Agent**: [GitHub Copilot SDK](https://github.com/microsoft/copilot-sdk) (the agent runtime of Copilot CLI). Works with either a Copilot subscription (CLI sign-in) or **BYOK** (your own keys for OpenAI / Azure OpenAI / Anthropic / Ollama, etc.). There is no custom OAuth implementation.
 - **Document editing**: [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) is wired in as a host-side tool (the host runs the CLI directly). It enables high-fidelity OOXML-level editing: pivots, tracked changes, animations, equations, Mermaid diagrams, template merges, issue diagnostics, screenshots and more.
 - **Live editing**: Reads and writes the *currently open* document directly through the Office COM object model (undoable).
 - **Importing other files**: The agent reads `.docx` / `.xlsx` / `.pptx` files on your PC and inserts them into the open document (Word: insert into the body/selection, PowerPoint: insert slides, Excel: add sheets).
@@ -61,7 +61,7 @@ To use the installed add-in:
 
 - Windows 10/11 **x64**, Microsoft 365 / Office 2021 or later for Windows
 - Microsoft Edge WebView2 Runtime (normally present on Windows 11 / Microsoft 365)
-- [Node.js](https://nodejs.org/) 20.19 or later, **x64** build (`node` on PATH). The installer warns if it is missing.
+- [Node.js](https://nodejs.org/) 20.19 or later in the 20.x line, or 22.12 or later, **x64** build (`node` on PATH). The installer warns if it is missing.
 - [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) (`officecli` on PATH: `irm https://raw.githubusercontent.com/iOfficeAI/OfficeCLI/main/install.ps1 | iex`). Optional but recommended: without it the advanced document tools are disabled.
 - A model to talk to, one of:
   - **BYOK** (verified): your own OpenAI / Azure OpenAI / Anthropic / Ollama key or local model, set up in the task pane. See [BYOK](#byok-your-own-api-keys--local-models).
@@ -197,7 +197,7 @@ Notes: the installer is x64 only and unsigned. Building the VSTO projects in Rel
 This project is built on the following open-source software:
 
 - **[OfficeCLI](https://github.com/iOfficeAI/OfficeCLI)** (iOfficeAI, Apache-2.0) — the document engine that reads, writes, renders and diagnoses Word / Excel / PowerPoint files. All of this add-in's advanced editing features are provided by calling the OfficeCLI CLI from the host.
-- **[GitHub Copilot SDK](https://github.com/github/copilot-sdk)** (GitHub, MIT) — the agent runtime. The tool-calling loop, MCP connections, BYOK and permission control are features of the Copilot SDK / Copilot CLI.
+- **[GitHub Copilot SDK](https://github.com/microsoft/copilot-sdk)** (Microsoft / GitHub, MIT) — the agent runtime. The tool-calling loop, MCP connections, BYOK and permission control are features of the Copilot SDK / Copilot CLI.
 - [office-agents](https://github.com/hewliyang/office-agents) (hewliyang, MIT) — inspiration for embedding a BYOK agent in an Office add-in.
 - [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) — hosts the task pane UI.
 

@@ -1,4 +1,4 @@
-import type { PermissionRequest } from "@github/copilot-sdk";
+import type { PermissionRequest } from "@microsoft/copilot-sdk";
 
 type ShellRequest = Extract<PermissionRequest, { kind: "shell" }>;
 
@@ -17,8 +17,8 @@ const FEEDERS = new Set(["echo", "write-output", "printf", "cat", "type", "get-c
 export function isOfficecliOnlyShell(request: ShellRequest): boolean {
   if (request.managedApprovalRequired || request.requestSandboxBypass) return false;
   if (request.hasWriteFileRedirection || (request.possibleUrls?.length ?? 0) > 0) return false;
-  // `request.commands` is not usable here: for PowerShell the SDK reports the whole command line as a
-  // single identifier and leaves hasWriteFileRedirection false even with `>`. Our own parse decides.
+  // `request.commands` is not relied on: SDK 1.x reported a whole PowerShell command line as a single
+  // identifier and left hasWriteFileRedirection false even with `>`. Our own parse decides.
 
   const segments = splitPipeline(request.fullCommandText);
   if (!segments || segments.length === 0) return false;

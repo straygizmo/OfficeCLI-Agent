@@ -5,7 +5,7 @@ import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { CopilotClient, RuntimeConnection, type ModelInfo } from "@github/copilot-sdk";
+import { CopilotClient, RuntimeConnection, type Model } from "@microsoft/copilot-sdk";
 import { WebSocketServer, type WebSocket } from "ws";
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MAX_FILES, PROTOCOL_VERSION, WS_PATH, isClientMessage, type ClientMessage, type ModelSummary } from "@officecli-agent/protocol";
 import { AgentSession } from "./agent-session.js";
@@ -46,17 +46,23 @@ export async function startHost(config: HostConfig): Promise<HostServer> {
     console.warn(`[host] officecli not found at '${config.officecliPath}'. Advanced document tools will be disabled.`);
   }
 
+  fs.mkdirSync(config.workspaceRoot, { recursive: true });
   const client = new CopilotClient({
-    connection: RuntimeConnection.forStdio(config.copilotCliPath ? { path: config.copilotCliPath } : undefined),
-    workingDirectory: config.workspaceRoot,
-    logLevel: "warning",
+    // CLI-equivalent defaults: built-in file/shell tools, ~/.copilot config, skills and MCP servers.
+    mode: "coding-agent",
+    // A separate runtime process, as before (the v2 default would load the runtime into this process).
+    runtime: RuntimeConnection.forSpawnedStdio({
+      ...(config.copilotCliPath ? { path: config.copilotCliPath } : {}),
+      workingDirectory: config.workspaceRoot,
+    }),
+    observability: { logLevel: "warning" },
   });
   await client.start();
   console.log("[host] Copilot CLI runtime started");
 
   let models: ModelSummary[] = [];
   try {
-    const list: ModelInfo[] = await client.listModels();
+    const list: Model[] = await client.listModels();
     models = list.map((m) => ({ id: m.id, name: m.name }));
   } catch (err) {
     console.warn(`[host] listModels failed: ${(err as Error).message}`);

@@ -32,8 +32,8 @@ try {
 
 $required = @(
     'dist\cli.js',
-    'node_modules\@github\copilot-sdk\package.json',
-    'node_modules\@github\copilot-sdk-win32-x64\prebuilds\win32-x64\copilot-runtime.exe',
+    'node_modules\@microsoft\copilot-sdk\package.json',
+    'node_modules\@microsoft\copilot-sdk-win32-x64\prebuilds\win32-x64\runtime.node',
     'node_modules\@officecli-agent\protocol\package.json'
 )
 foreach ($rel in $required) {
