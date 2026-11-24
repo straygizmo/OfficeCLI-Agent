@@ -4,6 +4,10 @@
 
 Word / Excel / PowerPoint（Windows デスクトップ版）に組み込む、オープンソースの AI エージェント **VSTO アドイン**です。
 
+![Word のタスクペインで文書の要点をまとめ、タイトルを書き換えている画面](docs/images/word-ja.png)
+
+*Word での使用例: 開いている文書の要点をチャットにまとめ、文書のタイトルを書き換えています。*
+
 - **エージェント**: [GitHub Copilot SDK](https://github.com/microsoft/copilot-sdk)（Copilot CLI のエージェントランタイム）。Copilot のサブスクリプション（CLI ログイン）か、**BYOK**（OpenAI / Azure OpenAI / Anthropic / Ollama などの自前キー）のどちらでも動きます。OAuth の独自実装はありません。
 - **文書編集**: [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) をホスト側のツールとして接続（ホストが CLI を直接実行）。ピボット、変更履歴、アニメーション、数式、Mermaid 図、テンプレート差し込み、問題診断、スクリーンショットなど OOXML レベルの編集を高精度に行えます。
 - **ライブ編集**: Office の COM オブジェクトモデルで「いま開いている文書」を直接読み書き（Undo 可）。
