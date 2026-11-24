@@ -40,7 +40,7 @@ namespace OfficeCliAgent.Word
                 case "importFile": return ImportFile(Ops.Str(op, "path"), Ops.Options(op));
                 case "insertImage": return InsertImage(Ops.Str(op, "path"), Ops.Options(op));
                 case "word.getSelection": return GetSelection();
-                case "word.insertText": return InsertText(Ops.Str(op, "text", ""), Ops.Str(op, "location", "Selection"), Ops.Str(op, "style"));
+                case "word.insertText": return InsertText(Ops.Str(op, "text", ""), Ops.Str(op, "location", "Selection"), Ops.Str(op, "style"), Ops.Str(op, "list"));
                 case "word.replaceText": return ReplaceText(Ops.Str(op, "find"), Ops.Str(op, "replace", ""), Ops.Bool(op, "matchCase"), Ops.Bool(op, "replaceAll", true));
                 default: throw new OfficeOpException($"Operation '{kind}' is not supported in Word.");
             }
@@ -190,23 +190,85 @@ namespace OfficeCliAgent.Word
             return new JObject { ["text"] = sel.Text, ["start"] = sel.Start, ["end"] = sel.End, ["type"] = sel.Type.ToString() };
         }
 
-        private JToken InsertText(string text, string location, string style)
+        private JToken InsertText(string text, string location, string style, string list)
         {
-            var range = TargetRange(location);
-            range.Text = text.Replace("\r\n", "\n").Replace("\n", "\r");
+            var doc = Doc;
+            var body = (text ?? "").Replace("\r\n", "\n").Replace("\n", "\r");
+            Interop.Range inserted;
+            object inherited = null; // style for the new paragraphs when the caller names none
+            var newParagraphs = false;
+
+            if (location == "End")
+            {
+                // Always start new paragraph(s): writing into the last paragraph would join the text to it
+                // and a style meant for the new text would restyle that whole paragraph.
+                body = body.TrimEnd('\r');
+                var last = doc.Paragraphs.Last;
+                var lastIsEmpty = (last.Range.Text ?? "").Trim('\r', '\n', '\a', ' ', '\t', '　').Length == 0;
+                var pos = doc.Content.End - 1; // just before the final paragraph mark
+                var at = doc.Range(pos, pos);
+                if (lastIsEmpty)
+                {
+                    at.Text = body;
+                    inserted = doc.Range(at.Start, at.End);
+                }
+                else
+                {
+                    // What pressing Enter at the end would give: the style that follows the last
+                    // paragraph's style (body text after a heading), not a copy of the heading.
+                    try { inherited = ((Interop.Style)last.get_Style()).get_NextParagraphStyle(); } catch { }
+                    at.Text = "\r" + body;
+                    inserted = doc.Range(at.Start + 1, at.End);
+                    newParagraphs = true;
+                }
+            }
+            else if (location == "Start")
+            {
+                body = body.TrimEnd('\r') + "\r";
+                var at = doc.Content;
+                at.Collapse(Interop.WdCollapseDirection.wdCollapseStart);
+                at.Text = body;
+                inserted = doc.Range(at.Start, at.End - 1);
+                newParagraphs = true;
+            }
+            else
+            {
+                inserted = _app.Selection.Range;
+                inserted.Text = body;
+            }
+
+            var notes = new List<string>();
             if (!string.IsNullOrEmpty(style))
             {
                 try
                 {
                     object st = style;
-                    range.set_Style(ref st);
+                    inserted.set_Style(ref st);
                 }
                 catch (Exception ex)
                 {
-                    return $"Inserted {text.Length} characters, but style '{style}' could not be applied: {ex.Message}";
+                    notes.Add($"style '{style}' could not be applied: {ex.Message}");
                 }
             }
-            return $"Inserted {text.Length} characters at {location}.";
+            else if (inherited != null)
+            {
+                try { inserted.set_Style(ref inherited); } catch { }
+            }
+
+            try
+            {
+                if (list == "bullet") inserted.ListFormat.ApplyBulletDefault();
+                else if (list == "number") inserted.ListFormat.ApplyNumberDefault();
+                else if (newParagraphs) inserted.ListFormat.RemoveNumbers(); // do not continue a list the neighbour is in
+            }
+            catch (Exception ex)
+            {
+                if (list == "bullet" || list == "number") notes.Add($"list formatting could not be applied: {ex.Message}");
+            }
+
+            var where = newParagraphs || location == "End" ? $"at {location} as new paragraph(s)" : $"at {location}";
+            var result = $"Inserted {text?.Length ?? 0} characters {where}";
+            return notes.Count > 0 ? result + ", but " + string.Join("; ", notes) + "." : result + ".";
         }
 
         private JToken ReplaceText(string find, string replace, bool matchCase, bool replaceAll)

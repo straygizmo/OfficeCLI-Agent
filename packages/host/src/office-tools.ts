@@ -4,6 +4,7 @@ import { defineTool, type Tool } from "@microsoft/copilot-sdk";
 import { z } from "zod";
 import type { DocumentContext, HostApp, ImportOptions, InsertImageOptions, OfficeOp, UiLocale } from "@officecli-agent/protocol";
 import type { TaskpaneLink } from "./taskpane-link.js";
+import { normalizeReplaceArgs } from "./word-args.js";
 
 export interface OfficeToolContext {
   hostApp: HostApp;
@@ -234,24 +235,30 @@ export function createOfficeTools(ctx: OfficeToolContext): Tool<unknown>[] {
     }),
     defineTool("word_insert_text", {
       description:
-        "Insert text into the live Word document. location: Selection (replaces the selection; default) | Start | End. " +
-        "Use \\n for paragraph breaks. Optionally apply a paragraph style name (e.g. 'Heading 1', '見出し 1').",
+        "Insert plain text into the live Word document. location: Selection (replaces the selection; default) | Start | End. " +
+        "Each line (\\n) becomes its own paragraph. At Start and End the text is added as new paragraph(s), never joined to the existing first/last paragraph. " +
+        "`style` (a paragraph style name, e.g. 'Heading 1', '見出し 1') and `list` apply to the inserted paragraphs only, so add a heading and its body with separate calls. " +
+        "Markdown is not interpreted: for a bulleted or numbered list pass the items as lines with list='bullet' or 'number', without bullet characters.",
       parameters: z.object({
-        text: z.string(),
+        text: z.string().describe("The text to insert; \\n separates paragraphs."),
         location: z.enum(["Selection", "Start", "End"]).default("Selection"),
-        style: z.string().optional(),
+        style: z.string().optional().describe("Paragraph style name for the inserted paragraphs."),
+        list: z.enum(["none", "bullet", "number"]).optional().describe("Make the inserted paragraphs a bulleted or numbered list."),
       }),
-      handler: async ({ text, location, style }) => run({ kind: "word.insertText", text, location, style }),
+      handler: async ({ text, location, style, list }) =>
+        run({ kind: "word.insertText", text, location, style, list: list === "bullet" || list === "number" ? list : undefined }),
     }),
     defineTool("word_replace_text", {
-      description: "Find and replace text in the live Word document (Word's Find; supports replaceAll and matchCase). Returns the number of replacements.",
+      description:
+        "Find and replace text in the live Word document (Word's Find). Parameters: `find` (text to search for) and `replace` (text to put in its place). " +
+        "Returns the number of replacements.",
       parameters: z.object({
-        find: z.string(),
-        replace: z.string(),
+        find: z.string().describe("The exact text to search for."),
+        replace: z.string().describe("The text that replaces each match."),
         matchCase: z.boolean().default(false),
-        replaceAll: z.boolean().default(true),
+        replaceAll: z.boolean().default(true).describe("false replaces only the first match."),
       }),
-      handler: async (args) => run({ kind: "word.replaceText", ...args }),
+      handler: async (args) => run({ kind: "word.replaceText", ...normalizeReplaceArgs(args) }),
     }),
   ] as Tool<unknown>[];
 
