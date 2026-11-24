@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { defineTool, type Tool } from "@github/copilot-sdk";
+import { defineTool, type Tool } from "@microsoft/copilot-sdk";
 import { z } from "zod";
 import type { DocumentContext, HostApp, ImportOptions, InsertImageOptions, OfficeOp, UiLocale } from "@officecli-agent/protocol";
 import type { TaskpaneLink } from "./taskpane-link.js";

@@ -662,7 +662,7 @@ export function App({ hostApp: initialHostApp }: Props) {
           <p className="muted small credits">
             Powered by{" "}
             <a href="https://github.com/iOfficeAI/OfficeCLI" target="_blank" rel="noreferrer">OfficeCLI</a> (Apache-2.0) and{" "}
-            <a href="https://github.com/github/copilot-sdk" target="_blank" rel="noreferrer">GitHub Copilot SDK</a> (MIT).
+            <a href="https://github.com/microsoft/copilot-sdk" target="_blank" rel="noreferrer">GitHub Copilot SDK</a> (MIT).
           </p>
         </section>
       )}

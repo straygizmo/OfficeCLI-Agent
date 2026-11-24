@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { defineTool, type Tool } from "@github/copilot-sdk";
+import { defineTool, type Tool } from "@microsoft/copilot-sdk";
 import { z } from "zod";
 import type { UiLocale } from "@officecli-agent/protocol";
 import { usesNativeRenderer } from "./officecli-shell.js";

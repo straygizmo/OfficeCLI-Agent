@@ -5,10 +5,10 @@ import type {
   CopilotClient,
   CopilotSession,
   PermissionHandler,
+  NamedProviderConfig,
   PermissionRequest,
-  ProviderConfig,
   SessionEvent,
-} from "@github/copilot-sdk";
+} from "@microsoft/copilot-sdk";
 import { COPILOT_PROVIDER, WEB_TOOL_NAMES, type AgentEvent, type AttachmentInput, type Catalog, type HostApp, type SessionSettings, type UiLocale } from "@officecli-agent/protocol";
 import { saveAttachments, toMessageOptions } from "./attachments.js";
 import { buildCatalog } from "./catalog.js";
@@ -18,6 +18,9 @@ import { isOfficecliOnlyShell } from "./officecli-shell.js";
 import { createOfficecliTool } from "./officecli-tool.js";
 import { buildSystemPrompt } from "./system-prompt.js";
 import type { TaskpaneLink } from "./taskpane-link.js";
+
+/** Name of the single BYOK connection a session registers; its models are selected as `byok/<model>`. */
+const BYOK_CONNECTION = "byok";
 
 export interface AgentSessionOptions {
   client: CopilotClient;
@@ -78,23 +81,31 @@ export class AgentSession {
     }
 
     this.session = await client.createSession({
-      model,
-      provider,
-      streaming: true,
+      // BYOK models are selected by their provider-qualified id; Copilot models by their bare id.
+      model: provider && model ? `${provider.name}/${model}` : model,
+      ...(provider && model
+        ? {
+            inference: { providers: [provider], models: [{ provider: provider.name, id: model }] },
+            // BYOK replaces Copilot for this session, as the single `provider` option did in SDK v1.
+            github: { capi: { enabled: false } },
+          }
+        : {}),
+      events: { streaming: true },
       workingDirectory: this.workspaceDir,
-      additionalDirectories: config.allowedDirectories,
-      tools,
+      filesystem: { additionalDirectories: config.allowedDirectories },
+      tools: {
+        definitions: tools,
+        excludedTools: this.settings.webSearch === false ? [...WEB_TOOL_NAMES] : undefined,
+      },
       // Load the MCP servers and skills the user's Copilot CLI has (~/.copilot); the pane shows and toggles them.
       enableConfigDiscovery: true,
-      enableSkills: true,
-      disabledMcpServers: config.disabledMcpServers,
-      disabledSkills: config.disabledSkills,
-      excludedTools: this.settings.webSearch === false ? [...WEB_TOOL_NAMES] : undefined,
+      skills: { enabled: true, disabledSkills: config.disabledSkills },
+      mcp: { disabledServers: config.disabledMcpServers },
       systemMessage: {
         mode: "append",
         content: buildSystemPrompt(hostApp, this.workspaceDir, officecliAvailable, workAcrossOpenFiles, this.settings.webSearch !== false),
       },
-      onPermissionRequest: this.permissionHandler,
+      permissions: { onRequest: this.permissionHandler },
     });
 
     this.unsubscribe = this.session.on((event) => this.forward(event));
@@ -176,8 +187,8 @@ export class AgentSession {
 
   // -------------------------------------------------------------------------
 
-  /** Map the selected provider name to a Copilot SDK ProviderConfig (BYOK) or none (Copilot). */
-  private resolveProvider(): { provider: ProviderConfig | undefined; model: string | undefined } {
+  /** Map the selected provider name to a Copilot SDK provider connection (BYOK) or none (Copilot). */
+  private resolveProvider(): { provider: NamedProviderConfig | undefined; model: string | undefined } {
     const { config } = this.opts;
     const name = this.settings.provider || config.defaultProvider || COPILOT_PROVIDER;
     if (name === COPILOT_PROVIDER) {
@@ -195,7 +206,9 @@ export class AgentSession {
           : `Provider '${name}' has no base URL.`,
       );
     }
-    const provider: ProviderConfig = {
+    const provider: NamedProviderConfig = {
+      // A fixed connection name: stored names are free text and the SDK forbids "/" in it.
+      name: BYOK_CONNECTION,
       type: stored.type,
       baseUrl,
       apiKey: resolveApiKey(stored),
