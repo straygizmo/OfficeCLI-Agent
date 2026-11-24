@@ -8,6 +8,12 @@ test("system prompt tells the agent where attachments live", () => {
   assert.match(text, /office_insert_image/);
 });
 
+test("system prompt routes officecli through the tool, with stdin for piped input", () => {
+  const text = buildSystemPrompt("Excel", "C:\\ws", true);
+  assert.match(text, /never through the shell/);
+  assert.match(text, /`stdin`/);
+});
+
 test("system prompt forbids web access when web search is off", () => {
   const off = buildSystemPrompt("Word", "C:\\ws", true, false, false);
   assert.match(off, /Web search is turned off by the user/);

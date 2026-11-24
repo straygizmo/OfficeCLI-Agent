@@ -14,6 +14,7 @@ import { saveAttachments, toMessageOptions } from "./attachments.js";
 import { buildCatalog } from "./catalog.js";
 import { resolveApiKey, resolveBaseUrl, type HostConfig } from "./config.js";
 import { createOfficeTools } from "./office-tools.js";
+import { isOfficecliOnlyShell } from "./officecli-shell.js";
 import { createOfficecliTool } from "./officecli-tool.js";
 import { buildSystemPrompt } from "./system-prompt.js";
 import type { TaskpaneLink } from "./taskpane-link.js";
@@ -273,6 +274,10 @@ export class AgentSession {
       return { kind: "approve-once" };
     }
     if (request.kind === "mcp" && autoReadOnly && request.readOnly) {
+      return { kind: "approve-once" };
+    }
+    // "Auto-approve OfficeCLI" also covers officecli reached through the shell (skills show it that way).
+    if (request.kind === "shell" && this.opts.officecliAvailable && (this.settings.autoApproveOfficecli ?? false) && isOfficecliOnlyShell(request)) {
       return { kind: "approve-once" };
     }
 

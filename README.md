@@ -109,7 +109,7 @@ Add `&lang=ja` or `&lang=en` to the URL to force the UI language; otherwise the 
 
 - `allowedDirectories`: Folders the agent may read and write without asking. Reading a file elsewhere with `office_import_file` shows an approval prompt in the task pane.
 - `autoApproveReadOnly`: Auto-approve read-only tool calls (file viewing and the read-only OfficeCLI commands view/get/query/help/validate). Shell commands, file writes and URL access always ask for approval in the task pane.
-- "Auto-approve OfficeCLI commands" (task pane setting, off by default): runs every `officecli` command, writes included, without asking. Takes effect immediately in the current chat.
+- "Auto-approve OfficeCLI commands" (task pane setting, off by default): runs every `officecli` command, writes included, without asking. This also covers shell commands that run nothing but `officecli` (including a pipe such as `echo '…' | officecli batch …`); shell commands with chaining, redirection or substitution, and screenshots through the native renderer, still ask. Takes effect immediately in the current chat.
 - `model`: Copilot model ID (defaults to the Copilot CLI default). Can also be chosen in the task pane settings (takes effect from the next session).
 - `copilotCliPath`: Path to the executable when `copilot` is not on PATH.
 - `disabledMcpServers` / `disabledSkills`: Copilot CLI MCP servers and skills switched off from the task pane's "+" menu (see below).

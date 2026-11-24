@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { defineTool, type Tool } from "@github/copilot-sdk";
 import { z } from "zod";
 import type { UiLocale } from "@officecli-agent/protocol";
+import { usesNativeRenderer } from "./officecli-shell.js";
 import type { TaskpaneLink } from "./taskpane-link.js";
 
 export interface OfficecliToolContext {
@@ -40,13 +41,16 @@ export function createOfficecliTool(ctx: OfficecliToolContext): Tool<unknown> {
       "`set deck.pptx /slide[1]/shape[1] --prop text=\"Hello\"`, `add deck.pptx / --type slide --prop title=\"Q4\"`, " +
       "`batch file.docx --input ops.json`, `merge tpl.docx out.docx --data '{...}'`. " +
       "Run `help <docx|xlsx|pptx> <set|add|query>` when unsure about properties. " +
-      "Read-only verbs (view/get/query/help/validate) run immediately; writes ask the user for approval. " +
+      "Where OfficeCLI docs or skills pipe data in (`echo '[…]' | officecli batch file.xlsx --json`, heredocs), pass that text as `stdin` " +
+      "instead of using a shell or writing a temp file. Always run officecli through this tool, never through the shell. " +
+      "Read-only verbs (view/get/query/help/validate) run immediately; writes may ask the user for approval. " +
       "Screenshots/stats are rendered with the built-in engine (never the running Office app).",
     parameters: z.object({
       command: z.union([z.string(), z.array(z.string())]).describe("Command line without the leading `officecli`."),
+      stdin: z.string().optional().describe("Text piped to officecli's standard input, e.g. the JSON operations array for `batch`."),
     }),
     skipPermission: true,
-    handler: async ({ command }) => {
+    handler: async ({ command, stdin }) => {
       let argv = typeof command === "string" ? splitCommandLine(command) : command.map(String);
       if (argv.length === 0) return { textResultForLlm: "Empty command.", resultType: "failure" as const };
       argv = forceHtmlRenderer(argv);
@@ -55,13 +59,17 @@ export function createOfficecliTool(ctx: OfficecliToolContext): Tool<unknown> {
       const autoApproved = ctx.autoApproveAll() || (READ_ONLY_VERBS.has(verb) && ctx.autoApproveReadOnly());
       if (!autoApproved) {
         const approved = await ctx.link.askPermission(
-          { kind: "officecli", title: ctx.locale === "ja" ? "officecli を実行します" : "Run officecli", detail: "officecli " + argv.map(quoteForDisplay).join(" ") },
+          {
+            kind: "officecli",
+            title: ctx.locale === "ja" ? "officecli を実行します" : "Run officecli",
+            detail: "officecli " + argv.map(quoteForDisplay).join(" ") + (stdin ? `\n\n[stdin]\n${clipDetail(stdin)}` : ""),
+          },
           ctx.permissionTimeoutMs,
         );
         if (!approved) return { textResultForLlm: "The user declined to run this officecli command.", resultType: "failure" as const };
       }
 
-      const { code, stdout, stderr } = await run(ctx.officecliPath, argv, ctx.workspaceDir);
+      const { code, stdout, stderr } = await run(ctx.officecliPath, argv, ctx.workspaceDir, stdin);
       const out = [stdout.trim(), stderr.trim() ? `[stderr]\n${stderr.trim()}` : ""].filter(Boolean).join("\n");
       const text = clip(out || "(no output)");
       if (code !== 0) {
@@ -73,22 +81,26 @@ export function createOfficecliTool(ctx: OfficecliToolContext): Tool<unknown> {
 }
 
 /** Make `view … screenshot|stats` use the HTML pipeline unless the caller chose explicitly. */
-function forceHtmlRenderer(argv: string[]): string[] {
-  const isView = argv[0]?.toLowerCase() === "view";
-  const mode = argv[2]?.toLowerCase();
-  if (!isView || (mode !== "screenshot" && mode !== "stats")) return argv;
+export function forceHtmlRenderer(argv: string[]): string[] {
+  if (!usesNativeRenderer(argv)) return argv;
   const idx = argv.findIndex((a) => a === "--render" || a.startsWith("--render="));
   if (idx === -1) return [...argv, "--render", "html"];
   // Never allow the native backend: it would attach to the running Office instance.
   const next = [...argv];
-  if (next[idx] === "--render") next[idx + 1] = "html";
-  else next[idx] = "--render=html";
+  if (next[idx] === "--render") {
+    if (idx + 1 < next.length) next[idx + 1] = "html";
+    else next.push("html");
+  } else next[idx] = "--render=html";
   return next;
 }
 
-function run(bin: string, argv: string[], cwd: string): Promise<{ code: number; stdout: string; stderr: string }> {
+function clipDetail(text: string): string {
+  return text.length > 4000 ? text.slice(0, 4000) + `\n…(${text.length} chars total)` : text;
+}
+
+function run(bin: string, argv: string[], cwd: string, stdin?: string): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    execFile(
+    const child = execFile(
       bin,
       argv,
       { cwd, timeout: TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024, windowsHide: true, encoding: "utf8" },
@@ -97,6 +109,9 @@ function run(bin: string, argv: string[], cwd: string): Promise<{ code: number; 
         resolve({ code: typeof code === "number" ? code : 1, stdout: String(stdout ?? ""), stderr: String(stderr ?? "") + (err && typeof code !== "number" ? `\n${err.message}` : "") });
       },
     );
+    // Always close stdin so a command that reads it (e.g. `batch` without --input) never hangs.
+    child.stdin?.on("error", () => {});
+    child.stdin?.end(stdin ?? "");
   });
 }
 
