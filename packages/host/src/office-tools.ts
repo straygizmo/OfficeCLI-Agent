@@ -3,6 +3,8 @@ import path from "node:path";
 import { defineTool, type Tool } from "@microsoft/copilot-sdk";
 import { z } from "zod";
 import type { DocumentContext, HostApp, ImportOptions, InsertImageOptions, OfficeOp, UiLocale } from "@officecli-agent/protocol";
+import type { StoredImageProvider } from "./config.js";
+import { generateImage, saveGeneratedImage } from "./image-gen.js";
 import type { TaskpaneLink } from "./taskpane-link.js";
 import { normalizeReplaceArgs } from "./word-args.js";
 
@@ -17,6 +19,8 @@ export interface OfficeToolContext {
   permissionTimeoutMs: number;
   /** Expose the other documents open in the application (list + export copies). */
   workAcrossOpenFiles: boolean;
+  /** The image generation provider configured right now (undefined when none). */
+  imageProvider: () => StoredImageProvider | undefined;
 }
 
 const EXT: Record<HostApp, string> = { Word: "docx", Excel: "xlsx", PowerPoint: "pptx" };
@@ -202,6 +206,36 @@ export function createOfficeTools(ctx: OfficeToolContext): Tool<unknown>[] {
     },
   });
 
+  const generateImageTool = defineTool("office_generate_image", {
+    description:
+      "Generate a new picture from a text prompt with the image generation provider configured in the task pane settings, and save it in the session workspace. " +
+      "Returns the absolute path of the file; call office_insert_image with that path to place it in the document. " +
+      "The prompt is sent to that provider, so do not put confidential document text in it verbatim. One picture per call; it can take a minute.",
+    parameters: z.object({
+      prompt: z.string().min(1).describe("What to draw, in detail: subject, style, composition, colors, mood. Say explicitly when the picture must contain no text."),
+      aspect: z.enum(["square", "landscape", "portrait"]).default("square").describe("square (1:1) | landscape (3:2, good for slides and banners) | portrait (2:3)."),
+      fileName: z.string().optional().describe("File name without extension. Defaults to 'image'."),
+    }),
+    handler: async ({ prompt, aspect, fileName }) => {
+      const provider = ctx.imageProvider();
+      if (!provider) {
+        return {
+          textResultForLlm:
+            "No image generation provider is configured. Ask the user to open the task pane settings (gear icon) → Image generation, set a provider (e.g. OpenAI with an API key), and then repeat the request. It works in this chat as soon as it is saved.",
+          resultType: "failure" as const,
+        };
+      }
+      try {
+        const image = await generateImage(provider, prompt, aspect);
+        const file = await saveGeneratedImage(path.join(ctx.workspaceDir, "images"), sanitizeFileName(fileName, "image"), image);
+        const note = IMAGE_EXTS.includes(`.${image.ext}`) ? "Insert it with office_insert_image." : `Convert it to PNG before office_insert_image (.${image.ext} cannot be inserted as-is).`;
+        return `Generated ${file} (${image.bytes.length} bytes, model ${provider.model}). ${note}`;
+      } catch (err) {
+        return { textResultForLlm: clip((err as Error).message ?? String(err)), resultType: "failure" as const };
+      }
+    },
+  });
+
   const workspaceInfo = defineTool("workspace_info", {
     description: "Return the session workspace directory (scratch folder for exported/edited copies) and the folders on this PC the agent may read without asking.",
     parameters: z.object({}),
@@ -221,6 +255,7 @@ export function createOfficeTools(ctx: OfficeToolContext): Tool<unknown>[] {
     ...(ctx.workAcrossOpenFiles ? [listOpenDocs] : []),
     importFile,
     insertImage,
+    generateImageTool,
     workspaceInfo,
   ] as Tool<unknown>[];
 

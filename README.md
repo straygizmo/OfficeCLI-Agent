@@ -12,6 +12,7 @@ An open-source AI agent **VSTO add-in** for Word / Excel / PowerPoint (Windows d
 - **Document editing**: [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) is wired in as a host-side tool (the host runs the CLI directly). It enables high-fidelity OOXML-level editing: pivots, tracked changes, animations, equations, Mermaid diagrams, template merges, issue diagnostics, screenshots and more.
 - **Live editing**: Reads and writes the *currently open* document directly through the Office COM object model (undoable).
 - **Importing other files**: The agent reads `.docx` / `.xlsx` / `.pptx` files on your PC and inserts them into the open document (Word: insert into the body/selection, PowerPoint: insert slides, Excel: add sheets).
+- **Generating pictures**: with an image generation provider set in the task pane (OpenAI `gpt-image-2.6-flare`, Google Gemini "Nano Banana 2", Azure OpenAI, or any server with the OpenAI Images API), "generate a picture of … and insert it here" makes the agent create the image (`office_generate_image`) and place it in the open document. See [Image generation](#image-generation).
 - **Inserting pictures**: `office_insert_image` puts PNG / JPEG / GIF / BMP / TIFF / SVG / EMF / WMF files into the open document (Word: at the selection, Excel: at a cell, PowerPoint: on a slide).
 
 The task pane and ribbon follow the Office UI language: Japanese in Japanese environments, English everywhere else.
@@ -152,6 +153,25 @@ First run with your own key:
 - Environment variables are read from the host's environment, inherited when Office starts. Restart Office after setting or changing them.
 - BYOK requires a model ID (the provider's default `model`, or one entered in the task pane).
 - With BYOK, usage and rate limits are those of the provider; no Copilot premium requests are consumed. Pick a model that supports tool calling (for Ollama, Llama 3.1 or later, Qwen 2.5, etc.).
+
+## Image generation
+
+Set the provider in the task pane under "Settings → Image generation → Add" (presets: OpenAI / Google Gemini (Nano Banana 2) / Azure OpenAI). It is independent of the chat provider, so it also works when chatting through Copilot or a local model. After saving, ask in the chat, e.g. "Generate a watercolor illustration of a lighthouse and insert it at the cursor". The agent calls `office_generate_image` (the picture is saved under `images\` in the session workspace) and then `office_insert_image`. Saving takes effect immediately, including in the running chat.
+
+```jsonc
+{
+  "imageProvider": { "type": "openai", "baseUrl": "https://api.openai.com/v1", "model": "gpt-image-2.6-flare", "apiKeyEnv": "OPENAI_API_KEY" }
+  // Google Gemini (Nano Banana 2)
+  // "imageProvider": { "type": "gemini", "baseUrl": "https://generativelanguage.googleapis.com/v1beta", "model": "gemini-3.1-flash-image", "apiKeyEnv": "GEMINI_API_KEY" }
+  // Azure OpenAI: "model" is the deployment name
+  // "imageProvider": { "type": "azure", "baseUrl": "https://<resource>.openai.azure.com", "model": "<deployment>", "apiKeyEnv": "AZURE_OPENAI_API_KEY", "azureApiVersion": "2025-04-01-preview" }
+}
+```
+
+- `type: "openai"` calls `POST <baseUrl>/images/generations`, so other servers that implement the OpenAI Images API can be used too. `type: "azure"` calls `<baseUrl>/openai/deployments/<model>/images/generations`. `type: "gemini"` calls `<baseUrl>/models/<model>:generateContent`, so the other Gemini image models (e.g. `gemini-3-pro-image`) work by changing `model`.
+- `apiKey` / `apiKeyEnv` / `resourceNameEnv` behave as for BYOK providers. The key is never sent back to the task pane.
+- For OpenAI-compatible and Gemini providers the form fetches the provider's image models (when a preset or type is chosen, or with "Fetch models" after entering a key) and offers them in a dropdown; "Other (type the ID)…" accepts any ID. The list is filtered by model name, so a new model with an unusual name may need typing. Azure deployments cannot be listed with an API key: type the deployment name.
+- The agent chooses the aspect (square / landscape / portrait); one picture per call. Image prompts are sent to this provider and usage is billed by it.
 
 ## Composer menu ("+")
 

@@ -6,6 +6,9 @@ import {
   type ByokProviderInput,
   type Catalog,
   type HostApp,
+  type ImageModelsQuery,
+  type ImageProviderInput,
+  type ImageProviderSummary,
   type ModelSummary,
   type PermissionSummary,
   type ProviderSummary,
@@ -16,6 +19,7 @@ import { AttachmentChips } from "./AttachmentChips";
 import { Markdown } from "./Markdown";
 import { PlusMenu } from "./PlusMenu";
 import { acceptFiles, makeThumbnail, mimeTypeOf, readAsBase64, type PendingAttachment, type ShownAttachment } from "./attachments";
+import { ImageProviderEditor } from "./ImageProviderEditor";
 import { ProviderEditor } from "./ProviderEditor";
 import { Toggle } from "./Toggle";
 import { HostClient, defaultHostUrl, isEmbeddedInWebView2, type ConnectionState } from "./host-client";
@@ -107,6 +111,8 @@ export function App({ hostApp: initialHostApp }: Props) {
   const [models, setModels] = useState<ModelSummary[]>([]);
   const [providers, setProviders] = useState<ProviderSummary[]>([]);
   const [editingProvider, setEditingProvider] = useState<ProviderSummary | "new" | null>(null);
+  const [imageProvider, setImageProvider] = useState<ImageProviderSummary | undefined>(undefined);
+  const [editingImageProvider, setEditingImageProvider] = useState(false);
   const [settings, setSettings] = useState(loadSettings);
   const [permissions, setPermissions] = useState<PermissionSummary[]>([]);
   const [status, setStatus] = useState<string>("");
@@ -130,6 +136,21 @@ export function App({ hostApp: initialHostApp }: Props) {
   settingsRef.current = settings;
   // Name of a BYOK provider just added; selected once the host confirms the save.
   const addedProviderRef = useRef<string | null>(null);
+
+  // Model list requests from the image provider form, waiting for the host's answer.
+  const modelRequestsRef = useRef(new Map<string, { resolve(models: string[]): void; reject(err: Error): void }>());
+  const listImageModels = useCallback(
+    (provider: ImageModelsQuery) =>
+      new Promise<string[]>((resolve, reject) => {
+        const requestId = nextId();
+        modelRequestsRef.current.set(requestId, { resolve, reject });
+        clientRef.current?.send({ type: "imageProvider.listModels", requestId, provider });
+        window.setTimeout(() => {
+          if (modelRequestsRef.current.delete(requestId)) reject(new Error("timeout"));
+        }, 40_000);
+      }),
+    [],
+  );
 
   const append = useCallback((item: ChatItem) => setItems((prev) => [...prev, item]), []);
 
@@ -205,6 +226,7 @@ export function App({ hostApp: initialHostApp }: Props) {
           setHostApp(message.hostApp);
           setModels(message.models);
           setProviders(message.providers);
+          setImageProvider(message.imageProvider);
           setInfo({ workspaceDir: message.workspaceDir, officecliAvailable: message.officecliAvailable, allowedDirectories: message.allowedDirectories });
           setStatus(message.officecliAvailable ? "" : t.officecliMissing);
           setHostBuild(message.hostBuild ?? "");
@@ -230,6 +252,17 @@ export function App({ hostApp: initialHostApp }: Props) {
             setSettings((s) => ({ ...s, session }));
             clientRef.current?.send({ type: "settings.update", settings: session });
           }
+          break;
+        }
+        case "imageProvider":
+          setImageProvider(message.imageProvider);
+          setEditingImageProvider(false);
+          break;
+        case "imageProvider.models": {
+          const waiting = modelRequestsRef.current.get(message.requestId);
+          modelRequestsRef.current.delete(message.requestId);
+          if (message.error) waiting?.reject(new Error(message.error));
+          else waiting?.resolve(message.models);
           break;
         }
         case "status":
@@ -618,6 +651,46 @@ export function App({ hostApp: initialHostApp }: Props) {
                 }}
               />
             )}
+          </div>
+          <div className="provider-list">
+            <div className="row-between">
+              <span className="muted small">{t.imageGeneration}</span>
+              {!imageProvider && (
+                <button className="small-btn" onClick={() => setEditingImageProvider(true)}>
+                  {t.add}
+                </button>
+              )}
+            </div>
+            {imageProvider ? (
+              <div className="provider-row">
+                <span>
+                  <strong>{imageProvider.model}</strong>{" "}
+                  <span className="muted small">
+                    {imageProvider.type} · {imageProvider.baseUrl || (imageProvider.resourceNameEnv && `%${imageProvider.resourceNameEnv}%`)}
+                    {imageProvider.hasApiKey ? "" : t.noApiKey}
+                  </span>
+                </span>
+                <span>
+                  <button className="small-btn" onClick={() => setEditingImageProvider(true)}>
+                    {t.edit}
+                  </button>
+                  <button className="small-btn" onClick={() => clientRef.current?.send({ type: "imageProvider.delete" })}>
+                    {t.delete}
+                  </button>
+                </span>
+              </div>
+            ) : (
+              !editingImageProvider && <span className="muted small">{t.imageGenerationNone}</span>
+            )}
+            {editingImageProvider && (
+              <ImageProviderEditor
+                initial={imageProvider}
+                listModels={listImageModels}
+                onCancel={() => setEditingImageProvider(false)}
+                onSave={(input: ImageProviderInput) => clientRef.current?.send({ type: "imageProvider.save", provider: input })}
+              />
+            )}
+            <p className="muted small hint">{t.imageGenerationHint}</p>
           </div>
           <Toggle
             checked={settings.session.autoApproveReadOnly ?? true}

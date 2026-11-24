@@ -109,6 +109,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .row-end { display: flex; justify-content: flex-end; gap: 6px; }
 .provider-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; }
 .provider-row .muted { word-break: break-all; }
+.provider-row > span:last-child { flex-shrink: 0; white-space: nowrap; }
 .small-btn { border: 1px solid var(--border); background: transparent; color: var(--fg); padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: 4px; }
 .provider-editor { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
 .provider-editor label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }

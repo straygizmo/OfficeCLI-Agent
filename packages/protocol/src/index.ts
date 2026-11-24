@@ -166,6 +166,48 @@ export interface ProviderSummary {
   apiKeySource?: "stored" | "env";
 }
 
+export type ImageProviderType = "openai" | "azure" | "gemini";
+
+/**
+ * The image generation provider (one per host), as edited from the task pane.
+ * "openai" is any server with the OpenAI Images API (POST <baseUrl>/images/generations);
+ * "gemini" is the Gemini API's generateContent with an image model (Nano Banana family).
+ */
+export interface ImageProviderInput {
+  type: ImageProviderType;
+  /** e.g. https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta. May be empty for azure with `resourceNameEnv`. */
+  baseUrl: string;
+  /** Omit to keep the stored key when updating; empty string clears it. */
+  apiKey?: string;
+  /** Environment variable holding the key, used when no key is entered. Omit to keep; empty string clears it. */
+  apiKeyEnv?: string;
+  /** Azure only: environment variable holding the resource name, used when no base URL is entered. Omit to keep; empty clears. */
+  resourceNameEnv?: string;
+  /** Image model id, e.g. gpt-image-2.6-flare, gemini-3.1-flash-image (azure: the deployment name). */
+  model: string;
+  /** Azure API version (azure only). */
+  azureApiVersion?: string;
+}
+
+/**
+ * The connection part of the image provider form, for listing the provider's image models before saving.
+ * A blank apiKey means: the key already stored for this same type and base URL, or the environment variable.
+ */
+export type ImageModelsQuery = Pick<ImageProviderInput, "type" | "baseUrl" | "apiKey" | "apiKeyEnv" | "resourceNameEnv">;
+
+/** What the host tells the task pane about the image generation provider (never includes the key). */
+export interface ImageProviderSummary {
+  type: ImageProviderType;
+  baseUrl?: string;
+  model: string;
+  azureApiVersion?: string;
+  /** Environment variable names (not their values). */
+  apiKeyEnv?: string;
+  resourceNameEnv?: string;
+  hasApiKey: boolean;
+  apiKeySource?: "stored" | "env";
+}
+
 /** Task pane UI language: Japanese for Japanese environments, English otherwise. */
 export type UiLocale = "ja" | "en";
 
@@ -207,6 +249,11 @@ export type ClientMessage =
   | { type: "session.reset" }
   | { type: "provider.save"; provider: ByokProviderInput }
   | { type: "provider.delete"; name: string }
+  /** Set / remove the image generation provider used by office_generate_image (takes effect immediately). */
+  | { type: "imageProvider.save"; provider: ImageProviderInput }
+  | { type: "imageProvider.delete" }
+  /** Ask the host for the image models the provider in the form offers (answered by imageProvider.models). */
+  | { type: "imageProvider.listModels"; requestId: string; provider: ImageModelsQuery }
   /** Switch a Copilot CLI MCP server / skill on or off (live for the running session, persisted for the next). */
   | { type: "mcp.setEnabled"; name: string; enabled: boolean }
   | { type: "skills.setEnabled"; name: string; enabled: boolean };
@@ -278,6 +325,8 @@ export type ServerMessage =
       hostBuild?: string;
       models: ModelSummary[];
       providers: ProviderSummary[];
+      /** Absent when no image generation provider is configured. */
+      imageProvider?: ImageProviderSummary;
       settings: SessionSettings;
       workspaceDir: string;
       allowedDirectories: string[];
@@ -285,6 +334,10 @@ export type ServerMessage =
       catalog: Catalog;
     }
   | { type: "providers"; providers: ProviderSummary[] }
+  /** Sent after imageProvider.save / imageProvider.delete; `imageProvider` is absent once removed. */
+  | { type: "imageProvider"; imageProvider?: ImageProviderSummary }
+  /** Answer to imageProvider.listModels: model ids, likeliest first; `error` says why the list is empty. */
+  | { type: "imageProvider.models"; requestId: string; models: string[]; error?: string }
   | { type: "catalog"; catalog: Catalog }
   | { type: "office.request"; requestId: string; op: OfficeOp }
   | { type: "agent.event"; event: AgentEvent }
