@@ -205,8 +205,9 @@ export function deleteProvider(config: HostConfig, name: string): void {
  * fields only editable in config.json (headers) are kept.
  */
 export function mergeImageProvider(existing: StoredImageProvider | undefined, input: ImageProviderInput): StoredImageProvider {
-  const model = input.model?.trim();
-  if (!model) throw new Error("An image model id is required.");
+  const model = input.model?.trim() ?? "";
+  // An OpenAI-compatible server (e.g. a local one serving a single model) may go without a model id.
+  if (!model && input.type !== "openai") throw new Error("An image model id is required.");
   const baseUrl = (input.baseUrl ?? "").trim();
   const resourceNameEnv = input.type === "azure" ? (input.resourceNameEnv ?? existing?.resourceNameEnv)?.trim() : "";
   if (baseUrl ? !/^https?:\/\//i.test(baseUrl) : !resourceNameEnv) {

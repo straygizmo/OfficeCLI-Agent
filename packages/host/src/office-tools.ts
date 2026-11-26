@@ -229,7 +229,7 @@ export function createOfficeTools(ctx: OfficeToolContext): Tool<unknown>[] {
         const image = await generateImage(provider, prompt, aspect);
         const file = await saveGeneratedImage(path.join(ctx.workspaceDir, "images"), sanitizeFileName(fileName, "image"), image);
         const note = IMAGE_EXTS.includes(`.${image.ext}`) ? "Insert it with office_insert_image." : `Convert it to PNG before office_insert_image (.${image.ext} cannot be inserted as-is).`;
-        return `Generated ${file} (${image.bytes.length} bytes, model ${provider.model}). ${note}`;
+        return `Generated ${file} (${image.bytes.length} bytes, model ${provider.model || "server default"}). ${note}`;
       } catch (err) {
         return { textResultForLlm: clip((err as Error).message ?? String(err)), resultType: "failure" as const };
       }

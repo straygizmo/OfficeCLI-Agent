@@ -83,7 +83,8 @@ export function ImageProviderEditor({ initial, listModels, onSave, onCancel }: P
     const baseUrl = form.baseUrl.trim();
     const viaEnv = isAzure && Boolean(form.resourceNameEnv?.trim());
     if (baseUrl ? !/^https?:\/\//i.test(baseUrl) : !viaEnv) return setError(isAzure ? t.baseUrlInvalidAzure : t.baseUrlInvalid);
-    if (!form.model.trim()) return setError(t.imageModelRequired);
+    // OpenAI-compatible servers (e.g. local ones) may go without a model id; the server then uses its default.
+    if (!form.model.trim() && form.type !== "openai") return setError(t.imageModelRequired);
     setError("");
     onSave({ ...form, apiKey: form.apiKey === "" ? undefined : form.apiKey });
   };
@@ -145,7 +146,7 @@ export function ImageProviderEditor({ initial, listModels, onSave, onCancel }: P
       )}
       <label>
         {t.apiKey} {apiKeyNote ? <span className="muted small">{apiKeyNote}</span> : null}
-        <input type="password" value={form.apiKey ?? ""} onChange={(e) => set({ apiKey: e.target.value })} />
+        <input type="password" value={form.apiKey ?? ""} placeholder={t.apiKeyPlaceholder} onChange={(e) => set({ apiKey: e.target.value })} />
       </label>
       <label>
         {t.apiKeyEnv}
@@ -172,6 +173,7 @@ export function ImageProviderEditor({ initial, listModels, onSave, onCancel }: P
         ) : (
           <input value={form.model} placeholder={isAzure ? undefined : isGemini ? "gemini-3.1-flash-image" : "gpt-image-2.6-flare"} onChange={(e) => set({ model: e.target.value })} />
         )}
+        {form.type === "openai" && <span className="muted small">{t.imageModelOptionalHint}</span>}
         {fetchError && <span className="muted small">{fetchError}</span>}
       </label>
       {!isAzure && (

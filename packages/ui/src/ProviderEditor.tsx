@@ -110,6 +110,7 @@ export function ProviderEditor({ initial, onSave, onCancel }: Props) {
       <label>
         {t.defaultModelId}
         <input value={form.model ?? ""} onChange={(e) => set({ model: e.target.value })} />
+        {form.type === "openai" && <span className="muted small">{t.modelOptionalHint}</span>}
       </label>
       {isAzure && (
         <label>

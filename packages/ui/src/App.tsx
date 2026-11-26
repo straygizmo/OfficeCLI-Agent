@@ -664,7 +664,7 @@ export function App({ hostApp: initialHostApp }: Props) {
             {imageProvider ? (
               <div className="provider-row">
                 <span>
-                  <strong>{imageProvider.model}</strong>{" "}
+                  <strong>{imageProvider.model || t.defaultModelShort}</strong>{" "}
                   <span className="muted small">
                     {imageProvider.type} · {imageProvider.baseUrl || (imageProvider.resourceNameEnv && `%${imageProvider.resourceNameEnv}%`)}
                     {imageProvider.hasApiKey ? "" : t.noApiKey}

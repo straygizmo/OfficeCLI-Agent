@@ -190,7 +190,10 @@ test("saveGeneratedImage never overwrites", async () => {
 });
 
 test("mergeImageProvider validates input and keeps the stored key unless one is given", () => {
-  assert.throws(() => mergeImageProvider(undefined, { type: "openai", baseUrl: "https://x/v1", model: " " }), /model/);
+  assert.throws(() => mergeImageProvider(undefined, { type: "gemini", baseUrl: "https://x/v1beta", model: " " }), /model/);
+  assert.throws(() => mergeImageProvider(undefined, { type: "azure", baseUrl: "https://x", model: "" }), /model/);
+  // OpenAI-compatible (e.g. a local server): no model and no key are fine.
+  assert.equal(mergeImageProvider(undefined, { type: "openai", baseUrl: "http://localhost:8080/v1", model: " " }).model, "");
   assert.throws(() => mergeImageProvider(undefined, { type: "openai", baseUrl: "x/v1", model: "m" }), /baseUrl/);
   assert.throws(() => mergeImageProvider(undefined, { type: "azure", baseUrl: "", model: "m" }), /baseUrl/);
 
@@ -208,4 +211,13 @@ test("mergeImageProvider validates input and keeps the stored key unless one is 
 
   const azure = mergeImageProvider(undefined, { type: "azure", baseUrl: "", model: "dep", resourceNameEnv: "AZURE_RESOURCE_NAME" });
   assert.equal(azure.resourceNameEnv, "AZURE_RESOURCE_NAME");
+});
+
+test("buildImageRequest omits the model for an OpenAI-compatible server without one", () => {
+  const local: StoredImageProvider = { type: "openai", baseUrl: "http://localhost:8080/v1", model: "" };
+  const req = buildImageRequest(local, "a cat", "square");
+  assert.equal(req.url, "http://localhost:8080/v1/images/generations");
+  assert.equal("model" in req.body, false);
+  assert.equal(req.headers.authorization, undefined);
+  assert.throws(() => buildImageRequest({ ...local, type: "gemini" }, "a cat", "square"), /model/);
 });

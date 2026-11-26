@@ -141,7 +141,7 @@ export interface ByokProviderInput {
   apiKeyEnv?: string;
   /** Azure only: environment variable holding the resource name, used when no base URL is entered. Omit to keep; empty clears. */
   resourceNameEnv?: string;
-  /** Default model id for this provider (required by the runtime for BYOK). */
+  /** Default model id for this provider. Empty for openai: the first model the server lists (GET <baseUrl>/models). */
   model?: string;
   /** openai/azure only. */
   wireApi?: "completions" | "responses";
@@ -183,7 +183,7 @@ export interface ImageProviderInput {
   apiKeyEnv?: string;
   /** Azure only: environment variable holding the resource name, used when no base URL is entered. Omit to keep; empty clears. */
   resourceNameEnv?: string;
-  /** Image model id, e.g. gpt-image-2.6-flare, gemini-3.1-flash-image (azure: the deployment name). */
+  /** Image model id, e.g. gpt-image-2.6-flare, gemini-3.1-flash-image (azure: the deployment name). May be empty for openai (server default). */
   model: string;
   /** Azure API version (azure only). */
   azureApiVersion?: string;
