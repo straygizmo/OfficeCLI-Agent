@@ -11,6 +11,7 @@ import type {
 } from "@microsoft/copilot-sdk";
 import { COPILOT_PROVIDER, WEB_TOOL_NAMES, type AgentEvent, type AttachmentInput, type Catalog, type HostApp, type SessionSettings, type UiLocale } from "@officecli-agent/protocol";
 import { saveAttachments, toMessageOptions } from "./attachments.js";
+import { firstServerModel } from "./byok-models.js";
 import { buildCatalog } from "./catalog.js";
 import { resolveApiKey, resolveBaseUrl, type HostConfig } from "./config.js";
 import { createOfficeTools } from "./office-tools.js";
@@ -66,7 +67,7 @@ export class AgentSession {
       imageProvider: () => config.imageProvider,
     });
 
-    const { provider, model } = this.resolveProvider();
+    const { provider, model } = await this.resolveProvider();
 
     if (officecliAvailable) {
       tools.push(
@@ -190,7 +191,7 @@ export class AgentSession {
   // -------------------------------------------------------------------------
 
   /** Map the selected provider name to a Copilot SDK provider connection (BYOK) or none (Copilot). */
-  private resolveProvider(): { provider: NamedProviderConfig | undefined; model: string | undefined } {
+  private async resolveProvider(): Promise<{ provider: NamedProviderConfig | undefined; model: string | undefined }> {
     const { config } = this.opts;
     const name = this.settings.provider || config.defaultProvider || COPILOT_PROVIDER;
     if (name === COPILOT_PROVIDER) {
@@ -198,8 +199,6 @@ export class AgentSession {
     }
     const stored = config.providers.find((p) => p.name === name);
     if (!stored) throw new Error(`Unknown provider '${name}'. Configure it in the task pane settings.`);
-    const model = this.settings.model || stored.model;
-    if (!model) throw new Error(`Provider '${name}' needs a model id (BYOK requires an explicit model).`);
     const baseUrl = resolveBaseUrl(stored);
     if (!baseUrl) {
       throw new Error(
@@ -208,12 +207,23 @@ export class AgentSession {
           : `Provider '${name}' has no base URL.`,
       );
     }
+    const apiKey = resolveApiKey(stored);
+    let model = this.settings.model?.trim() || stored.model?.trim();
+    if (!model) {
+      // No model id: an OpenAI-compatible server (typically a local LLM) is asked which models it has.
+      if (stored.type !== "openai") throw new Error(`Provider '${name}' needs a model id (${stored.type === "azure" ? "the deployment name" : "e.g. claude-sonnet-4.5"}).`);
+      try {
+        model = await firstServerModel(baseUrl, apiKey, stored.headers);
+      } catch (err) {
+        throw new Error(`Provider '${name}' has no model id and the server's model list could not be used: ${(err as Error).message}. Enter a model id.`);
+      }
+    }
     const provider: NamedProviderConfig = {
       // A fixed connection name: stored names are free text and the SDK forbids "/" in it.
       name: BYOK_CONNECTION,
       type: stored.type,
       baseUrl,
-      apiKey: resolveApiKey(stored),
+      apiKey,
       wireApi: stored.type === "anthropic" ? undefined : (stored.wireApi ?? defaultWireApi(stored.type, baseUrl)),
       modelProvider: stored.modelProvider,
       azure: stored.type === "azure" && stored.azureApiVersion ? { apiVersion: stored.azureApiVersion } : undefined,

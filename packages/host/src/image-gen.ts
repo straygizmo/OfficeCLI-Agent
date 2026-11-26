@@ -35,10 +35,13 @@ export function imageSize(model: string, aspect: ImageAspect): string {
 /** Aspect ratios as the Gemini API names them. */
 const GEMINI_ASPECT: Record<ImageAspect, string> = { square: "1:1", landscape: "3:2", portrait: "2:3" };
 
-/** The HTTP request for one picture. Throws when the provider is missing a base URL or model. */
+/**
+ * The HTTP request for one picture. Throws when the provider is missing a base URL, or a model
+ * (only the OpenAI-compatible type may go without one: the server then uses its own default).
+ */
 export function buildImageRequest(provider: StoredImageProvider, prompt: string, aspect: ImageAspect): ImageRequest {
-  const model = provider.model?.trim();
-  if (!model) throw new Error("The image generation provider has no model id.");
+  const model = provider.model?.trim() ?? "";
+  if (!model && provider.type !== "openai") throw new Error("The image generation provider has no model id.");
   const baseUrl = resolveBaseUrl(provider)?.replace(/\/+$/, "");
   if (!baseUrl) {
     throw new Error(
@@ -73,7 +76,7 @@ export function buildImageRequest(provider: StoredImageProvider, prompt: string,
     };
   }
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-  return { url: `${baseUrl}/images/generations`, headers, body: { model, ...body } };
+  return { url: `${baseUrl}/images/generations`, headers, body: model ? { model, ...body } : body };
 }
 
 /** File extension for image bytes, from their signature. */
