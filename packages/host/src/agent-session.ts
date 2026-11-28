@@ -17,6 +17,7 @@ import { resolveApiKey, resolveBaseUrl, type HostConfig } from "./config.js";
 import { createOfficeTools } from "./office-tools.js";
 import { isOfficecliOnlyShell } from "./officecli-shell.js";
 import { createOfficecliTool } from "./officecli-tool.js";
+import { describeAuthError, isAuthError, probeAuthFailure, type ProbeTarget } from "./provider-errors.js";
 import { buildSystemPrompt } from "./system-prompt.js";
 import type { TaskpaneLink } from "./taskpane-link.js";
 
@@ -42,6 +43,8 @@ export class AgentSession {
   private unsubscribe: (() => void) | undefined;
   private settings: SessionSettings;
   private catalogValue: Catalog = { mcpServers: [], skills: [], mcpConfigPath: "", skillsDir: "" };
+  /** The BYOK provider this session talks to (undefined for Copilot), for explaining auth errors. */
+  private byokTarget: ProbeTarget | undefined;
 
   constructor(private readonly opts: AgentSessionOptions) {
     this.settings = { ...opts.settings };
@@ -229,6 +232,7 @@ export class AgentSession {
       azure: stored.type === "azure" && stored.azureApiVersion ? { apiVersion: stored.azureApiVersion } : undefined,
       headers: stored.headers,
     };
+    this.byokTarget = { name, type: stored.type, baseUrl, apiKey, headers: stored.headers };
     return { provider, model };
   }
 
@@ -281,9 +285,19 @@ export class AgentSession {
       case "session.idle":
         this.emit({ kind: "idle" });
         break;
-      case "session.error":
-        this.emit({ kind: "error", message: event.data.message });
+      case "session.error": {
+        const target = this.byokTarget;
+        if (target && isAuthError(event.data)) {
+          // The runtime's message names its own env vars; ask the provider for the real reason.
+          const data = event.data;
+          void probeAuthFailure(target).then((probe) =>
+            this.emit({ kind: "error", message: describeAuthError(this.opts.locale, target, data, probe) }),
+          );
+        } else {
+          this.emit({ kind: "error", message: event.data.message });
+        }
         break;
+      }
       default:
         break;
     }
